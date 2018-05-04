@@ -9,6 +9,9 @@ matrix:
     - python: "2.7"
     - python: "3.5"
     - python: "3.6"
+  allow_failures:
+    - env: LINT_CHECK
+      python: "2.7"
 
 install:
   - sudo apt-get update
@@ -26,3 +29,6 @@ install:
   - conda install cython
   - python setup.py install
   - pip install --upgrade pytest
+
+script:
+  - pytest test/
