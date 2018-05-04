@@ -23,5 +23,6 @@ install:
 
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pytorch scipy -c pytorch
   - source activate test-environment
+  - conda install mkl mkl-service
   - python setup.py install
   - pip install --upgrade pytest
