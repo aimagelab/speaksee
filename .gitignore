@@ -1,1 +1,4 @@
 /.idea
+/speaksee.egg-info
+/speaksee/*.pyc
+*.pyc

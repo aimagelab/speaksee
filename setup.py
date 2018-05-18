@@ -10,7 +10,9 @@ setup(name='speaksee',
       packages=['speaksee'],
       install_requires=[
           'torch',
+          'torchvision',
           'numpy',
-          'h5py'
+          'h5py',
+          'tqdm',
       ],
       zip_safe=False)
