@@ -11,10 +11,10 @@ class Association(object):
             self.right_children[p[1]].add(p[0])
 
     def left_set(self):
-        return self.left_children.keys()
+        return list(self.left_children.keys())
 
     def right_set(self):
-        return self.right_children.keys()
+        return list(self.right_children.keys())
 
     def __getitem__(self, i):
         return self.pairs[i]

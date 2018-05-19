@@ -1,6 +1,6 @@
 import os
 import json
-from association import Association
+from .association import Association
 
 
 class Dataset(object):
@@ -54,22 +54,6 @@ class Flickr(PairedDataset):
         train_samples = []
         val_samples = []
         test_samples = []
-
-        '''
-        samples = []
-        ids = []
-        for i, d in enumerate(dataset):
-            if d['split'] == split:
-                ids += [(i, x) for x in range(len(d['sentences']))]
-
-        for i in range(len(ids)):
-            ann_id = ids[i]
-            img_id = ann_id[0]
-            caption = dataset[img_id]['sentences'][ann_id[1]]['raw']
-            path = dataset[img_id]['filename']
-
-            samples.append((os.path.join(img_root, path), caption))
-        '''
 
         for d in dataset:
             for c in d['sentences']:
