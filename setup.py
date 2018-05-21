@@ -14,5 +14,6 @@ setup(name='speaksee',
           'numpy',
           'h5py',
           'tqdm',
+          'requests',
       ],
       zip_safe=False)
