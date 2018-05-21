@@ -9,8 +9,9 @@ import pickle as pkl
 import os
 
 from .dataset import Dataset
+from ..vocab import Vocab
 # from .pipeline import Pipeline
-# from .utils import get_tokenizer
+from .utils import get_tokenizer
 # from ..vocab import Vocab, SubwordVocab
 from torchvision.datasets.folder import default_loader
 
@@ -105,6 +106,8 @@ class ImageField(RawField):
 
 
 class TextField(RawField):
+    vocab_cls = Vocab
+
     def __init__(self, use_vocab=True, init_token=None, eos_token=None, fix_length=None, dtype=torch.long,
                  preprocessing=None, postprocessing=None, lower=False, tokenize=(lambda s: s.split()),
                  include_lengths=False, batch_first=False, pad_token="<pad>", unk_token="<unk>", pad_first=False,
@@ -115,13 +118,14 @@ class TextField(RawField):
         self.fix_length = fix_length
         self.dtype = dtype
         self.lower = lower
-        self.tokenize = tokenize
+        self.tokenize = get_tokenizer(tokenize)
         self.include_lengths = include_lengths
         self.batch_first = batch_first
         self.pad_token = pad_token
         self.unk_token = unk_token
         self.pad_first = pad_first
         self.truncate_first = truncate_first
+        self.vocab = None
         super(TextField, self).__init__(preprocessing, postprocessing)
 
     def preprocess(self, x):
@@ -141,13 +145,20 @@ class TextField(RawField):
         sources = []
         for arg in args:
             if isinstance(arg, Dataset):
-                sources += [getattr(arg, name) for name, field in args.fields.items() if field is self]
+                sources += [getattr(arg, name) for name, field in arg.fields.items() if field is self]
             else:
                 sources.append(arg)
 
         for data in sources:
             for x in data:
+                x = self.preprocess(x)
                 try:
                     counter.update(x)
                 except TypeError:
                     counter.update(chain.from_iterable(x))
+
+        specials = list(OrderedDict.fromkeys([
+            tok for tok in [self.unk_token, self.pad_token, self.init_token,
+                            self.eos_token]
+            if tok is not None]))
+        self.vocab = self.vocab_cls(counter, specials=specials, **kwargs)
