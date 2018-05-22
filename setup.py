@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='speaksee',
       version='0.1',
@@ -7,7 +7,7 @@ setup(name='speaksee',
       author='Lorenzo Baraldi, Marcella Cornia',
       author_email='lorenzo.baraldi@unimore.it',
       license='MIT',
-      packages=['speaksee'],
+      packages=find_packages(exclude=('test', )),
       install_requires=[
           'torch>=0.4.0',
           'torchvision',
