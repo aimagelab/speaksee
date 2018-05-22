@@ -11,6 +11,19 @@ class Dataset(object):
         self.examples = examples
         self.fields = dict(fields)
 
+    def collate_fn(self):
+        def collate(batch):
+            transposed = list(zip(*batch))
+            tensors = []
+            for field, data in zip(self.fields.values(), transposed):
+                tensor = field.process(data)
+                if isinstance(tensor, tuple):
+                    tensors.extend(tensor)
+                else:
+                    tensors.append(tensor)
+            return tensors
+        return collate
+
     def __len__(self):
         return len(self.examples)
 
@@ -56,19 +69,19 @@ class PairedDataset(Dataset):
     def __getitem__(self, i):
         sample = super(PairedDataset, self).__getitem__(i)
         image = self.fields['image'].preprocess(sample.image)
-        text = self.fields['text'](sample.text)
+        text = self.fields['text'].preprocess(sample.text)
         return image, text
 
     def __len__(self):
         return len(self.examples)
 
 
-class FlickrDataset(PairedDataset):
+class Flickr(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_file):
         dataset = json.load(open(ann_file, 'r'))['images']
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(dataset, img_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(FlickrDataset, self).__init__(examples, image_field, text_field)
+        super(Flickr, self).__init__(examples, image_field, text_field)
 
     @property
     def splits(self):
@@ -100,7 +113,7 @@ class FlickrDataset(PairedDataset):
         return train_samples, val_samples, test_samples
 
 
-class COCODataset(PairedDataset):
+class COCO(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=False):
         roots = {}
         roots['train'] = {
@@ -137,7 +150,7 @@ class COCODataset(PairedDataset):
 
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(roots, ids)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(COCODataset, self).__init__(examples, image_field, text_field)
+        super(COCO, self).__init__(examples, image_field, text_field)
 
     @property
     def splits(self):
