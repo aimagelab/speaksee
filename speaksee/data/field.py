@@ -177,7 +177,6 @@ class TextField(RawField):
 
         for data in sources:
             for x in data:
-                x = self.preprocess(x)
                 try:
                     counter.update(x)
                 except TypeError:

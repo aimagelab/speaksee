@@ -21,19 +21,31 @@ class Dataset(object):
                     tensors.extend(tensor)
                 else:
                     tensors.append(tensor)
-            return tensors
+
+            if len(tensors) > 1:
+                return tensors
+            else:
+                return tensors[0]
         return collate
+
+    def __getitem__(self, i):
+        example = self.examples[i]
+        data = []
+        for field_name, field in self.fields.items():
+            data.append(field.preprocess(getattr(example, field_name)))
+
+        if len(data) > 1:
+            return data
+        else:
+            return data[0]
 
     def __len__(self):
         return len(self.examples)
 
-    def __getitem__(self, i):
-        return self.examples[i]
-
     def __getattr__(self, attr):
         if attr in self.fields:
             for x in self.examples:
-                yield getattr(x, attr)
+                yield self.fields[attr].preprocess(getattr(x, attr))
 
 
 class PairedDataset(Dataset):
@@ -55,25 +67,19 @@ class PairedDataset(Dataset):
             self.image_children[e.image].add(e.text)
             self.text_children[e.text].add(e.image)
 
+    def image_dataset(self):
+        image_set = list(self.image_children.keys())
+        dataset = Dataset(image_set, {'image': self.image_field})
+        return dataset
 
-    def image_set(self):
-        return list(self.image_children.keys())
-
-    def text_set(self):
-        return list(self.text_children.keys())
+    def text_dataset(self):
+        text_set = list(self.text_children.keys())
+        dataset = Dataset(text_set, {'text': self.image_field})
+        return dataset
 
     @property
     def splits(self):
         raise NotImplementedError
-
-    def __getitem__(self, i):
-        sample = super(PairedDataset, self).__getitem__(i)
-        image = self.fields['image'].preprocess(sample.image)
-        text = self.fields['text'].preprocess(sample.text)
-        return image, text
-
-    def __len__(self):
-        return len(self.examples)
 
 
 class Flickr(PairedDataset):
