@@ -9,7 +9,7 @@ setup(name='speaksee',
       license='MIT',
       packages=['speaksee'],
       install_requires=[
-          'torch',
+          'torch>=0.4.0',
           'torchvision',
           'numpy',
           'h5py',
