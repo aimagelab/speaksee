@@ -197,7 +197,7 @@ class COCODataset(PairedDataset):
 
 
 class TabularDataset(PairedDataset):
-    def __init__(self, img_root, ann_file_root, image_field, text_field):
+    def __init__(self, image_field, text_field, img_root, ann_file_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file_root, img_root)
         examples = self.train_examples + self.val_examples + self.test_examples
         super(TabularDataset, self).__init__(examples, image_field, text_field)
