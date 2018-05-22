@@ -16,5 +16,6 @@ setup(name='speaksee',
           'tqdm',
           'requests',
           'pycocotools',
+          'matplotlib',
       ],
       zip_safe=False)
