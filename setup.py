@@ -15,5 +15,6 @@ setup(name='speaksee',
           'h5py',
           'tqdm',
           'requests',
+          'pycocotools',
       ],
       zip_safe=False)
