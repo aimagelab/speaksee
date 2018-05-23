@@ -29,6 +29,10 @@ install:
   - conda install cython
   - python setup.py install
   - pip install --upgrade pytest
+  - pip install codecov
 
 script:
-  - pytest test/
+  - pytest --cov=./ test/
+
+after_success:
+  - codecov --token=8b21484b-7ff4-4028-bfa4-f10e0ef8fa22
