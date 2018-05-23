@@ -27,13 +27,14 @@ install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pytorch scipy -c pytorch
   - source activate test-environment
   - conda install cython
-  - python setup.py install
   - pip install --upgrade pytest
   - pip install pytest-cov
   - pip install codecov
+  - pip install -e .
 
 script:
-  - pytest --cov=speakee test/
+  - cd speaksee
+  - pytest --cov=speakee ../test/
 
 after_success:
   - codecov --token=8b21484b-7ff4-4028-bfa4-f10e0ef8fa22
