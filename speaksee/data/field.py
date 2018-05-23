@@ -13,6 +13,7 @@ from .dataset import Dataset
 from ..vocab import Vocab
 from .utils import get_tokenizer
 from torchvision.datasets.folder import default_loader
+from torchvision import transforms
 
 
 class RawField(object):
@@ -88,6 +89,7 @@ class ImageField(RawField):
             return precomp_data[index.index(x)]
         else:
             x = default_loader(x)
+            x = transforms.ToTensor(x)
             if self.preprocessing is not None:
                 return self.preprocessing(x)
             else:
