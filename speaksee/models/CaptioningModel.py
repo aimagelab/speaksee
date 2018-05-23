@@ -7,6 +7,9 @@ class CaptioningModel(nn.Module):
     def init_weights(self):
         raise NotImplementedError
 
+    def forward(self, *input):
+        raise NotImplementedError
+
     def init_state(self, b_s):
         raise NotImplementedError
 

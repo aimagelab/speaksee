@@ -64,7 +64,7 @@ class FC(CaptioningModel):
     def init_state(self, b_s):
         h0 = Variable(torch.zeros((b_s, self.rnn_size)))
         c0 = Variable(torch.zeros((b_s, self.rnn_size)))
-        return (h0, c0)
+        return h0, c0
 
     def forward(self, images, seq):
         b_s = images.size(0)
