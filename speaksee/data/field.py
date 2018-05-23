@@ -68,7 +68,7 @@ class ImageField(RawField):
         self.precomp_path = precomp_path
         self.precomp_data = None
         self.precomp_index = None
-        if os.path.exists(precomp_path):
+        if precomp_path is not None and os.path.exists(precomp_path):
             self.precomp_data = pkl.load(open(precomp_path, 'rb'))
 
     def preprocess(self, x, avoid_precomp=False):
