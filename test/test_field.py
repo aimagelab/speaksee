@@ -4,7 +4,15 @@ import unittest
 import speaksee.data as data
 
 
-class TestTextField(unittest.TestCase):
+class TestImageField(object):
+    def test_preprocessing(self):
+        field = data.ImageField()
+        image = ''
+        expected_image = ''
+        assert field.preprocess(image) == expected_image
+
+
+class TestTextField(object):
     def test_pad(self):
         # Default case.
         field = data.TextField()
