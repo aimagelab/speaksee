@@ -152,10 +152,9 @@ class TextField(RawField):
     def preprocess(self, x):
         if six.PY2 and isinstance(x, six.string_types) and not isinstance(x, six.text_type):
             x = six.text_type(x, encoding='utf-8')
-        if isinstance(x, six.text_type):
-            x = self.tokenize(x.rstrip('\n'))
         if self.lower:
             x = six.text_type.lower(x)
+        x = self.tokenize(x.rstrip('\n'))
         if self.preprocessing is not None:
             return self.preprocessing(x)
         else:
