@@ -3,7 +3,7 @@ import json
 import numpy as np
 from collections import defaultdict
 from .example import Example
-from pycocotools.coco import COCO
+from pycocotools.coco import COCO as pyCOCO
 
 
 class Dataset(object):
@@ -173,10 +173,10 @@ class COCO(PairedDataset):
 
         for split in ['train', 'val', 'test']:
             if isinstance(roots[split]['cap'], tuple):
-                coco_dataset = (COCO(roots[split]['cap'][0]), COCO(roots[split]['cap'][1]))
+                coco_dataset = (pyCOCO(roots[split]['cap'][0]), pyCOCO(roots[split]['cap'][1]))
                 root = roots[split]['img']
             else:
-                coco_dataset = (COCO(roots[split]['cap']),)
+                coco_dataset = (pyCOCO(roots[split]['cap']),)
                 root = (roots[split]['img'],)
 
             if ids_dataset is None:
