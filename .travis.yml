@@ -29,6 +29,7 @@ install:
   - conda install cython
   - python setup.py install
   - pip install --upgrade pytest
+  - pip install pytest-cov
   - pip install codecov
 
 script:
