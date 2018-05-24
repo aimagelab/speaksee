@@ -27,11 +27,8 @@ install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pytorch scipy -c pytorch
   - source activate test-environment
   - conda install cython
-  - pip install pytest coverall
+  - pip install pytest coveralls
   - pip install .
 
 script:
   - pytest ./test
-
-after_success:
-  - coveralls
