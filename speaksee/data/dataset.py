@@ -120,7 +120,9 @@ class Flickr(PairedDataset):
 
 
 class COCO(PairedDataset):
-    def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=False):
+    # TODO check correctness of Karpathy's splits.
+    # TODO fix behaviour when use_restval=False
+    def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=True):
         roots = {}
         roots['train'] = {
             'img': os.path.join(img_root, 'train2014'),
