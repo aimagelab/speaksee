@@ -45,7 +45,7 @@ class Dataset(object):
     def __getattr__(self, attr):
         if attr in self.fields:
             for x in self.examples:
-                yield self.fields[attr].preprocess(getattr(x, attr))
+                yield getattr(x, attr)
 
 
 class PairedDataset(Dataset):

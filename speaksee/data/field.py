@@ -89,14 +89,26 @@ class ImageField(RawField):
             return precomp_data[index.index(x)]
         else:
             x = default_loader(x)
-            x = transforms.ToTensor(x)
+            x = transforms.ToTensor()(x)
             if self.preprocessing is not None:
                 return self.preprocessing(x)
             else:
                 return x
 
-    def precomp(self, xs):
+    def precomp(self, *args):
+        sources = []
         precomp_data = []
+
+        for arg in args:
+            if isinstance(arg, Dataset):
+                sources += [getattr(arg, name) for name, field in arg.fields.items() if field is self]
+            else:
+                sources.append(arg)
+
+        xs = []
+        for data in sources:
+            xs.extend(data)
+
         xs = set(xs)
         for x in tqdm(xs, desc='Building precomputed data'):
             precomp_data.append(self.preprocess(x, avoid_precomp=True))
@@ -178,6 +190,7 @@ class TextField(RawField):
 
         for data in sources:
             for x in data:
+                self.preprocess(x)
                 try:
                     counter.update(x)
                 except TypeError:

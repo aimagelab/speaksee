@@ -14,6 +14,6 @@ class EncodeCNN(object):
         x = x.to(next(self.cnn.parameters()).device)
 
         with torch.no_grad():
-            x = self.cnn(x).data.cpu().numpy()
+            x = self.cnn(x).squeeze(0).data.cpu().numpy()
 
         return x
