@@ -6,7 +6,7 @@ import six
 import torch
 from tqdm import tqdm
 import numpy as np
-import pickle as pkl
+import h5py
 import os
 
 from .dataset import Dataset
@@ -67,10 +67,16 @@ class ImageField(RawField):
     def __init__(self, preprocessing=None, postprocessing=None, precomp_path=None):
         super(ImageField, self).__init__(preprocessing, postprocessing)
         self.precomp_path = precomp_path
-        self.precomp_data = None
+        self.precomp_file = None
         self.precomp_index = None
-        if precomp_path is not None and os.path.exists(precomp_path):
-            self.precomp_data = pkl.load(open(precomp_path, 'rb'))
+        self.precomp_data = None
+
+        if self.precomp_path and os.path.isfile(self.precomp_path):
+            self.precomp_file = h5py.File(self.precomp_path, 'r')
+            self.precomp_index = list(self.precomp_file['index'])
+            if six.PY3:
+                self.precomp_index = [s.decode('utf-8') for s in self.precomp_index]
+            self.precomp_data = self.precomp_file['data']
 
     def preprocess(self, x, avoid_precomp=False):
         """
@@ -83,10 +89,9 @@ class ImageField(RawField):
         Returns:
 
         """
+        # TODO: we assume that this returns a tensor torch/numpy. Should be moved to a process() as in TextField
         if self.precomp_data and not avoid_precomp:
-            index = self.precomp_data[0]
-            precomp_data = self.precomp_data[1]
-            return precomp_data[index.index(x)]
+            return self.precomp_data[self.precomp_index.index(x)]
         else:
             x = default_loader(x)
             x = transforms.ToTensor()(x)
@@ -97,7 +102,6 @@ class ImageField(RawField):
 
     def precomp(self, *args):
         sources = []
-        precomp_data = []
 
         for arg in args:
             if isinstance(arg, Dataset):
@@ -108,14 +112,23 @@ class ImageField(RawField):
         xs = []
         for data in sources:
             xs.extend(data)
+        xs = list(set(xs))
 
-        xs = set(xs)
-        for x in tqdm(xs, desc='Building precomputed data'):
-            precomp_data.append(self.preprocess(x, avoid_precomp=True))
+        if self.precomp_file:
+            self.precomp_file.close()
+            self.precomp_file = None
 
-        precomp_data = np.concatenate(precomp_data, 0)
-        self.precomp_data = [xs, precomp_data]
-        pkl.dump(self.precomp_data, open(self.precomp_path, 'wb'), 2)
+        with h5py.File(self.precomp_path, 'w') as out:
+            example = self.preprocess(xs[0], avoid_precomp=True)
+            shape = [len(xs), ] + list(example.shape)
+            dset_data = out.create_dataset('data', shape, example.dtype, chunks=True)
+            out.create_dataset('index', data=np.array(xs, dtype='S'))
+            for i, x in enumerate(tqdm(xs, desc='Building precomputed data')):
+                dset_data[i] = self.preprocess(x, avoid_precomp=True)
+
+        self.precomp_file = h5py.File(self.precomp_path, 'r')
+        self.precomp_index = xs
+        self.precomp_data = self.precomp_file['data']
 
     def process(self, batch):
         return default_collate(batch)
