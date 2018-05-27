@@ -203,7 +203,7 @@ class TextField(RawField):
 
         for data in sources:
             for x in data:
-                self.preprocess(x)
+                x = self.preprocess(x)
                 try:
                     counter.update(x)
                 except TypeError:
