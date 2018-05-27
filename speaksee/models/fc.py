@@ -8,11 +8,11 @@ import torch.nn.functional as F
 from .CaptioningModel import CaptioningModel
 
 class LSTMCell(nn.Module):
-    def __init__(self, opt):
+    def __init__(self, input_encoding_size, rnn_size, dropout_prob_lm):
         super(LSTMCell, self).__init__()
-        self.input_encoding_size = opt.input_encoding_size
-        self.hidden_size = opt.rnn_size
-        self.dropout_prob = opt.dropout_prob_lm
+        self.input_encoding_size = input_encoding_size
+        self.hidden_size = rnn_size
+        self.dropout_prob = dropout_prob_lm
 
         self.i2h = nn.Linear(self.input_encoding_size, 5*self.hidden_size)
         self.h2h = nn.Linear(self.hidden_size, 5*self.hidden_size)
@@ -21,10 +21,10 @@ class LSTMCell(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        nn.init.xavier_uniform(self.i2h.weight)
-        nn.init.orthogonal(self.h2h.weight)
-        nn.init.constant(self.i2h.bias, 0)
-        nn.init.constant(self.h2h.bias, 0)
+        nn.init.xavier_uniform_(self.i2h.weight)
+        nn.init.orthogonal_(self.h2h.weight)
+        nn.init.constant_(self.i2h.bias, 0)
+        nn.init.constant_(self.h2h.bias, 0)
 
     def forward(self, xt, state):
         all_input_sums = self.i2h(xt) + self.h2h(state[0])
@@ -40,26 +40,26 @@ class LSTMCell(nn.Module):
         return output, state
 
 class FC(CaptioningModel):
-    def __init__(self, opt):
+    def __init__(self, vocab_size, img_feat_size, input_encoding_size, rnn_size, dropout_prob_lm, ss_prob=.0):
         super(FC, self).__init__()
-        self.vocabulary_size = opt.vocabulary_size
-        self.img_feat_size = opt.img_feat_size
-        self.input_encoding_size = opt.input_encoding_size
-        self.rnn_size = opt.rnn_size
+        self.vocab_size = vocab_size
+        self.img_feat_size = img_feat_size
+        self.input_encoding_size = input_encoding_size
+        self.rnn_size = rnn_size
 
-        self.embed = nn.Embedding(self.vocabulary_size, self.input_encoding_size)
-        self.fc_image = nn.Linear(self.img_feat_size, self.input_encoding_size)
-        self.lstm_cell = LSTMCell(opt)
-        self.out_fc = nn.Linear(self.rnn_size, self.vocabulary_size)
+        self.embed = nn.Embedding(vocab_size, input_encoding_size)
+        self.fc_image = nn.Linear(img_feat_size, input_encoding_size)
+        self.lstm_cell = LSTMCell(input_encoding_size, rnn_size, dropout_prob_lm)
+        self.out_fc = nn.Linear(rnn_size, vocab_size)
 
-        self.ss_prob = .1
+        self.ss_prob = ss_prob
         self.init_weights()
 
     def init_weights(self):
         init_range = .1
-        nn.init.uniform(self.embed.weight, -init_range, init_range)
-        nn.init.uniform(self.out_fc.weight, -init_range, init_range)
-        nn.init.constant(self.out_fc.bias, 0)
+        nn.init.uniform_(self.embed.weight, -init_range, init_range)
+        nn.init.uniform_(self.out_fc.weight, -init_range, init_range)
+        nn.init.constant_(self.out_fc.bias, 0)
 
     def init_state(self, b_s):
         h0 = Variable(torch.zeros((b_s, self.rnn_size)))
@@ -76,16 +76,14 @@ class FC(CaptioningModel):
             if t == 0:
                 xt = self.fc_image(images)
             else:
-                if t >= 2 and self.ss_prob < 1:
+                if self.training and t >= 1 and self.ss_prob > .0:
                     # Scheduled sampling
                     coin = images.data.new(b_s).uniform_(0, 1)
-                    coin = (coin < self.ss_prob).long() # if 1, true, else sample
+                    coin = (coin < self.ss_prob).long()
                     distr = distributions.Categorical(logits = outputs[-1].squeeze(1))
                     action = distr.sample()
-                    it = coin * seq[:, t-1].data + (1-coin) * action.data
-                    it = Variable(it, requires_grad=False)
-                    if images.is_cuda:
-                        it = it.cuda()
+                    it = coin * action.data + (1-coin) * seq[:, t-1].data
+                    it = it.to(images.device)
                 else:
                     it = seq[:, t-1]
                 xt = self.embed(it)
