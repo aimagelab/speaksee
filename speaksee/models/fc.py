@@ -61,15 +61,16 @@ class FC(CaptioningModel):
         nn.init.uniform_(self.out_fc.weight, -init_range, init_range)
         nn.init.constant_(self.out_fc.bias, 0)
 
-    def init_state(self, b_s):
-        h0 = Variable(torch.zeros((b_s, self.rnn_size)))
-        c0 = Variable(torch.zeros((b_s, self.rnn_size)))
+    def init_state(self, b_s, device):
+        h0 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
+        c0 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
         return h0, c0
 
     def forward(self, images, seq):
+        device = images.device
         b_s = images.size(0)
         seq_len = seq.size(1)
-        state = self.init_state(b_s)
+        state = self.init_state(b_s, device)
         outputs = []
 
         for t in range(seq_len):

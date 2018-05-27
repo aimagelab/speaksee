@@ -10,7 +10,7 @@ class CaptioningModel(nn.Module):
     def forward(self, *input):
         raise NotImplementedError
 
-    def init_state(self, b_s):
+    def init_state(self, b_s, device):
         raise NotImplementedError
 
     def sample(self):
