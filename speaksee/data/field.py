@@ -73,7 +73,7 @@ class ImageField(RawField):
 
         if self.precomp_path and os.path.isfile(self.precomp_path):
             self.precomp_file = h5py.File(self.precomp_path, 'r')
-            self.precomp_index = list(self.precomp_file['index'])
+            self.precomp_index = list(self.precomp_file['index'][:])
             if six.PY3:
                 self.precomp_index = [s.decode('utf-8') for s in self.precomp_index]
             self.precomp_data = self.precomp_file['data']
