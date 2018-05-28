@@ -89,7 +89,6 @@ class ImageField(RawField):
         Returns:
 
         """
-        # TODO: we assume that this returns a tensor torch/numpy. Should be moved to a process() as in TextField
         if self.precomp_data and not avoid_precomp:
             return self.precomp_data[self.precomp_index.index(x)]
         else:
