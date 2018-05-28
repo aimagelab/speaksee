@@ -154,11 +154,13 @@ class TextField(RawField):
         torch.int64: int,
         torch.long: int,
     }
+    punctuations = ["''", "'", "``", "`", "-LRB-", "-RRB-", "-LCB-", "-RCB-", \
+                    ".", "?", "!", ",", ":", "-", "--", "...", ";"]
 
     def __init__(self, use_vocab=True, init_token=None, eos_token=None, fix_length=None, dtype=torch.long,
                  preprocessing=None, postprocessing=None, lower=False, tokenize=(lambda s: s.split()),
-                 include_lengths=False, batch_first=True, pad_token="<pad>", unk_token="<unk>", pad_first=False,
-                 truncate_first=False):
+                 remove_punctuation=False, include_lengths=False, batch_first=True, pad_token="<pad>",
+                 unk_token="<unk>", pad_first=False, truncate_first=False):
         self.use_vocab = use_vocab
         self.init_token = init_token
         self.eos_token = eos_token
@@ -166,6 +168,7 @@ class TextField(RawField):
         self.dtype = dtype
         self.lower = lower
         self.tokenize = get_tokenizer(tokenize)
+        self.remove_punctuation = remove_punctuation
         self.include_lengths = include_lengths
         self.batch_first = batch_first
         self.pad_token = pad_token
@@ -181,6 +184,8 @@ class TextField(RawField):
         if self.lower:
             x = six.text_type.lower(x)
         x = self.tokenize(x.rstrip('\n'))
+        if self.remove_punctuation:
+            x = [w for w in x if w not in self.punctuations]
         if self.preprocessing is not None:
             return self.preprocessing(x)
         else:
