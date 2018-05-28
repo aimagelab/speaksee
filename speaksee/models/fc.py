@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import torch
 from torch import nn
 from torch import distributions
-from torch.autograd import Variable
 import torch.nn.functional as F
 from .CaptioningModel import CaptioningModel
 
@@ -77,14 +76,14 @@ class FC(CaptioningModel):
             if t == 0:
                 xt = self.fc_image(images)
             else:
-                if self.training and t >= 1 and self.ss_prob > .0:
+                if self.training and self.ss_prob > .0:
                     # Scheduled sampling
                     coin = images.data.new(b_s).uniform_(0, 1)
                     coin = (coin < self.ss_prob).long()
                     distr = distributions.Categorical(logits = outputs[-1].squeeze(1))
                     action = distr.sample()
                     it = coin * action.data + (1-coin) * seq[:, t-1].data
-                    it = it.to(images.device)
+                    it = it.to(device)
                 else:
                     it = seq[:, t-1]
                 xt = self.embed(it)
