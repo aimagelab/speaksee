@@ -1,10 +1,9 @@
 import os
 import json
 import numpy as np
-from collections import defaultdict
+from collections import defaultdict, Sequence
 from .example import Example
 from pycocotools.coco import COCO as pyCOCO
-
 
 class Dataset(object):
     def __init__(self, examples, fields):
@@ -13,9 +12,12 @@ class Dataset(object):
 
     def collate_fn(self):
         def collate(batch):
-            transposed = list(zip(*batch))
+            if not isinstance(batch[0], Sequence):
+                batch = [batch, ]
+            else:
+                batch = list(zip(*batch))
             tensors = []
-            for field, data in zip(self.fields.values(), transposed):
+            for field, data in zip(self.fields.values(), batch):
                 tensor = field.process(data)
                 if isinstance(tensor, tuple):
                     tensors.extend(tensor)
@@ -69,12 +71,14 @@ class PairedDataset(Dataset):
 
     def image_dataset(self):
         image_set = list(self.image_children.keys())
-        dataset = Dataset(image_set, {'image': self.image_field})
+        examples = [Example.fromdict({'image': i}) for i in image_set]
+        dataset = Dataset(examples, {'image': self.image_field})
         return dataset
 
     def text_dataset(self):
         text_set = list(self.text_children.keys())
-        dataset = Dataset(text_set, {'text': self.image_field})
+        examples = [Example.fromdict({'text': t}) for t in text_set]
+        dataset = Dataset(examples, {'text': self.image_field})
         return dataset
 
     @property
