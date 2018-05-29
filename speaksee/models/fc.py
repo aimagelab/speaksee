@@ -93,3 +93,22 @@ class FC(CaptioningModel):
             outputs.append(out)
 
         return torch.cat(outputs, 1)
+
+    def test(self, images, seq_len):
+        device = images.device
+        b_s = images.size(0)
+        state = self.init_state(b_s, device)
+        outputs = []
+
+        for t in range(seq_len):
+            if t == 0:
+                xt = self.fc_image(images)
+            else:
+                it = torch.max(outputs[-1].squeeze(1), -1)[1]
+                xt = self.embed(it)
+
+            out, state = self.lstm_cell(xt, state)
+            out = F.log_softmax(self.out_fc(out), dim=-1)
+            outputs.append(out)
+
+        return torch.max(torch.cat(outputs, 1), -1)[1]

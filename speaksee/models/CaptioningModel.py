@@ -13,11 +13,5 @@ class CaptioningModel(nn.Module):
     def init_state(self, b_s, device):
         raise NotImplementedError
 
-    def sample(self):
-        raise NotImplementedError
-
-    def sample_beam(self):
-        raise NotImplementedError
-
-    def beam_search(self):
+    def test(self, *input):
         raise NotImplementedError
