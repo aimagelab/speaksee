@@ -221,6 +221,87 @@ class COCO(PairedDataset):
         return train_samples, val_samples, test_samples
 
 
+class CUB200(PairedDataset):
+    def __init__(self, image_field, text_field, img_root, ann_root, split_root):
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
+        examples = self.train_examples + self.val_examples + self.test_examples
+        super(CUB200, self).__init__(examples, image_field, text_field)
+
+    @property
+    def splits(self):
+        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
+        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
+        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        return train_split, val_split, test_split
+
+    @classmethod
+    def get_samples(cls, img_root, ann_root, split_root):
+        train_samples = []
+        val_samples = []
+        test_samples = []
+
+        for split in ['train', 'val', 'test']:
+            if split == 'train':
+                split_filename = '%s_noCub.txt' % split
+            else:
+                split_filename = '%s.txt' % split
+            filenames = [f.strip() for f in open(os.path.join(split_root, split_filename), 'r').readlines()]
+
+            for filename in filenames:
+                captions = [f.strip() for f in open(os.path.join(ann_root, filename.replace('.jpg', '.txt')), 'r').readlines()]
+                for caption in captions:
+                    example = Example.fromdict({'image': os.path.join(img_root, filename), 'text': caption})
+
+                    if split == 'train':
+                        train_samples.append(example)
+                    elif split == 'val':
+                        val_samples.append(example)
+                    elif split == 'test':
+                        test_samples.append(example)
+
+        return train_samples, val_samples, test_samples
+
+
+class Oxford102(PairedDataset):
+    def __init__(self, image_field, text_field, img_root, ann_root, split_root):
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
+        examples = self.train_examples + self.val_examples + self.test_examples
+        super(Oxford102, self).__init__(examples, image_field, text_field)
+
+    @property
+    def splits(self):
+        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
+        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
+        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        return train_split, val_split, test_split
+
+    @classmethod
+    def get_samples(cls, img_root, ann_root, split_root):
+        train_samples = []
+        val_samples = []
+        test_samples = []
+
+        for split in ['train', 'val', 'test']:
+            classes = [f.strip() for f in open(os.path.join(split_root, '%sclasses.txt' % split), 'r').readlines()]
+
+            for c in classes:
+                filenames = [f for f in os.listdir(os.path.join(ann_root, c)) if f.endswith('.txt')]
+                for filename in filenames:
+                    captions = [f.strip() for f in open(os.path.join(ann_root, c, filename), 'r').readlines()]
+                    for caption in captions:
+                        example = Example.fromdict({'image': os.path.join(img_root, filename.replace('.txt', '.jpg')),
+                                                    'text': caption})
+
+                        if split == 'train':
+                            train_samples.append(example)
+                        elif split == 'val':
+                            val_samples.append(example)
+                        elif split == 'test':
+                            test_samples.append(example)
+
+        return train_samples, val_samples, test_samples
+
+
 class TabularDataset(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_file_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file_root, img_root)
