@@ -21,7 +21,7 @@ class LSTMCell(nn.Module):
 
     def init_weights(self):
         nn.init.xavier_uniform_(self.i2h.weight)
-        nn.init.orthogonal_(self.h2h.weight)
+        nn.init.xavier_uniform_(self.h2h.weight)
         nn.init.constant_(self.i2h.bias, 0)
         nn.init.constant_(self.h2h.bias, 0)
 
@@ -58,7 +58,9 @@ class FC(CaptioningModel):
         init_range = .1
         nn.init.uniform_(self.embed.weight, -init_range, init_range)
         nn.init.uniform_(self.out_fc.weight, -init_range, init_range)
+        nn.init.uniform_(self.fc_image.weight, -init_range, init_range)
         nn.init.constant_(self.out_fc.bias, 0)
+        nn.init.constant_(self.fc_image.bias, 0)
 
     def init_state(self, b_s, device):
         h0 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
@@ -112,3 +114,24 @@ class FC(CaptioningModel):
             outputs.append(out)
 
         return torch.max(torch.cat(outputs, 1), -1)[1]
+
+    def sample_rl(self, images, seq_len):
+        device = images.device
+        b_s = images.size(0)
+        state = self.init_state(b_s, device)
+        outputs = []
+
+        for t in range(seq_len):
+            if t == 0:
+                xt = self.fc_image(images)
+            else:
+                xt = self.embed(it)
+
+            out, state = self.lstm_cell(xt, state)
+            out = F.log_softmax(self.out_fc(out), dim=-1)
+            distr = distributions.Categorical(logits=out)
+            it = distr.sample()
+            outputs.append(distr.log_prob(it))
+
+        # togliere i <pad> dal grandiente?
+        return torch.cat(outputs, 1)
