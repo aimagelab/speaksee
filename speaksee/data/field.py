@@ -113,10 +113,6 @@ class ImageField(RawField):
             xs.extend(data)
         xs = list(set(xs))
 
-        if self.precomp_file:
-            self.precomp_file.close()
-            self.precomp_file = None
-
         with h5py.File(self.precomp_path, 'w') as out:
             example = self.preprocess(xs[0], avoid_precomp=True)
             shape = [len(xs), ] + list(example.shape)
