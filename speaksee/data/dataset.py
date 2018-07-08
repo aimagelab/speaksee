@@ -12,14 +12,11 @@ class Dataset(object):
 
     def collate_fn(self):
         def collate(batch):
-            if not isinstance(batch[0], Sequence):
-                batch = [batch, ]
-            else:
-                batch = list(zip(*batch))
+            batch = list(zip(*batch))
             tensors = []
             for field, data in zip(self.fields.values(), batch):
                 tensor = field.process(data)
-                if isinstance(tensor, tuple):
+                if isinstance(tensor, tuple) or isinstance(tensor, list):
                     tensors.extend(tensor)
                 else:
                     tensors.append(tensor)
@@ -36,10 +33,7 @@ class Dataset(object):
         for field_name, field in self.fields.items():
             data.append(field.preprocess(getattr(example, field_name)))
 
-        if len(data) > 1:
-            return data
-        else:
-            return data[0]
+        return data
 
     def __len__(self):
         return len(self.examples)
