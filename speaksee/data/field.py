@@ -60,7 +60,7 @@ class RawField(object):
         """
         if self.postprocessing is not None:
             batch = self.postprocessing(batch)
-        return batch
+        return default_collate(batch)
 
 
 class ImageField(RawField):
