@@ -301,3 +301,11 @@ class TextField(RawField):
             return var, lengths
         return var
 
+    def decode(self, cap):
+        words = []
+        for w in cap:
+            word = self.vocab.itos[int(w)]
+            if word == '<eos>':
+                break
+            words.append(word)
+        return words
