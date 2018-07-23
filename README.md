@@ -121,3 +121,8 @@ for e in range(50):
         'optimizer': optim.state_dict(),
     }, '/nas/houston/lorenzo/fc_epoch_%03d.pth' % e)
 ```
+
+### Model zoo
+| Model     | CIDEr | Download   |
+|-----------|-------|------------|
+| FC        | 93.78 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/fc_epoch_029.pth)        |
