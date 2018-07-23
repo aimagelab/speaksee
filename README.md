@@ -50,7 +50,7 @@ image_field = ImageField(preprocessing=prepro_pipeline, precomp_path='/nas/houst
 ### Pre-processing textual data
 ``` python
 # Pipeline for text
-text_field = TextField(eos_token='<eos>', lower=True, tokenize='spacy')
+text_field = TextField(eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True)
 ```
 
 ### Calling a dataset
@@ -84,12 +84,12 @@ for e in range(50):
     # Training
     model.train()
     running_loss = .0
-    with tqdm(desc='Epoch %d - train' % e, unit='it', total=len(iter(dataloader_train))) as pbar:
-        for it, (images, captions )in enumerate(iter(dataloader_train)):
+    with tqdm(desc='Epoch %d - train' % e, unit='it', total=len(dataloader_train)) as pbar:
+        for it, (images, captions )in enumerate(dataloader_train):
             images, captions = images.to(device), captions.to(device)
             out = model(images, captions)
             optim.zero_grad()
-            loss = loss_fn(out.transpose(1,2), captions)
+            loss = loss_fn(out.view(-1, len(text_field.vocab)), captions.view(-1))
             loss.backward()
             optim.step()
 
@@ -103,11 +103,11 @@ for e in range(50):
     # Validation
     model.eval()
     running_loss = .0
-    with tqdm(desc='Epoch %d - val' % e, unit='it', total=len(iter(dataloader_val))) as pbar:
-        for it, (images, captions )in enumerate(iter(dataloader_val)):
+    with tqdm(desc='Epoch %d - val' % e, unit='it', total=len(dataloader_val)) as pbar:
+        for it, (images, captions )in enumerate(dataloader_val):
             images, captions = images.to(device), captions.to(device)
             out = model(images, captions)
-            loss = loss_fn(out.transpose(1,2), captions)
+            loss = loss_fn(out.view(-1, len(text_field.vocab)), captions.view(-1))
 
             running_loss += loss.item()
             pbar.set_postfix(loss=running_loss / (it+1))

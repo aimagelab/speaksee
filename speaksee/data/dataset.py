@@ -1,9 +1,11 @@
 import os
 import json
 import numpy as np
-from collections import defaultdict, Sequence
+from collections import defaultdict
 from .example import Example
+from ..utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
+
 
 class Dataset(object):
     def __init__(self, examples, fields):
@@ -154,7 +156,8 @@ class COCO(PairedDataset):
         else:
             ids = None
 
-        self.train_examples, self.val_examples, self.test_examples = self.get_samples(roots, ids)
+        with nostdout():
+            self.train_examples, self.val_examples, self.test_examples = self.get_samples(roots, ids)
         examples = self.train_examples + self.val_examples + self.test_examples
         super(COCO, self).__init__(examples, image_field, text_field)
 
