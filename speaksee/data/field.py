@@ -75,6 +75,7 @@ class ImageField(RawField):
             self.precomp_index = list(precomp_file['index'][:])
             if six.PY3:
                 self.precomp_index = [s.decode('utf-8') for s in self.precomp_index]
+            #self.precomp_data = precomp_file['data'][()]
 
     def preprocess(self, x, avoid_precomp=False):
         """
@@ -123,8 +124,33 @@ class ImageField(RawField):
 
         self.precomp_index = xs
 
-    def process(self, batch):
-        return default_collate(batch)
+
+class ImageDetectionsField(RawField):
+    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
+        self.max_detections = 100
+        self.detections_path = detections_path
+        self.detections_file = h5py.File(self.detections_path, 'r')
+        self.detections = dict()
+        for key in self.detections_file.keys():
+            self.detections[key] = self.detections_file[key][()]
+
+        super(ImageDetectionsField, self).__init__(preprocessing, postprocessing)
+
+    def preprocess(self, x, avoid_precomp=False):
+        image_id = int(x.split('_')[-1].split('.')[0])
+        try:
+            #precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
+            precomp_data = self.detections['%d' % image_id][()]
+        except:
+            precomp_data = np.random.rand(10,2048)
+
+        delta = self.max_detections - precomp_data.shape[0]
+        if delta > 0:
+            precomp_data = np.concatenate([precomp_data, np.zeros((delta, precomp_data.shape[1]))], axis=0)
+        elif delta < 0:
+            precomp_data = precomp_data[:self.max_detections]
+
+        return precomp_data.astype(np.float32)
 
 
 class TextField(RawField):
