@@ -8,8 +8,12 @@ from .CaptioningModel import CaptioningModel
 
 
 class BottomupTopdownAttention(CaptioningModel):
+<<<<<<< HEAD
     def __init__(self, vocab_size, det_feat_size=2048, input_encoding_size=1000, rnn_size=1000, att_size=512,
                  ss_prob=.0):
+=======
+    def __init__(self, vocab_size, det_feat_size=2048, input_encoding_size=1000, rnn_size=1000, att_size=512, ss_prob=.0):
+>>>>>>> 9cc7defd5db5e5b0ab63f5cdd83a6446a337c4f5
         super(BottomupTopdownAttention, self).__init__()
         self.vocab_size = vocab_size
         self.det_feat_size = det_feat_size
@@ -67,7 +71,11 @@ class BottomupTopdownAttention(CaptioningModel):
                 # Scheduled sampling
                 coin = detections.data.new(b_s).uniform_(0, 1)
                 coin = (coin < self.ss_prob).long()
+<<<<<<< HEAD
                 distr = distributions.Categorical(logits = outputs[-1].squeeze(1))
+=======
+                distr = distributions.Categorical(logits=outputs[-1].squeeze(1))
+>>>>>>> 9cc7defd5db5e5b0ab63f5cdd83a6446a337c4f5
                 action = distr.sample()
                 it = coin * action.data + (1-coin) * seq[:, t-1].data
                 it = it.to(device)
@@ -84,6 +92,10 @@ class BottomupTopdownAttention(CaptioningModel):
             att_weights = F.softmax(att_weights, 1)
             att_detections = torch.sum(detections * att_weights, 1)
             input_2 = torch.cat([state_1[0], att_detections], 1)
+<<<<<<< HEAD
+=======
+            # input_2 = torch.cat([state_1[0], detections_mean], 1)
+>>>>>>> 9cc7defd5db5e5b0ab63f5cdd83a6446a337c4f5
 
             state_2 = self.lstm_cell_2(input_2, state_2)
             out = F.log_softmax(self.out_fc(state_2[0]), dim=-1)
