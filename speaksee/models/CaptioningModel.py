@@ -53,16 +53,17 @@ class CaptioningModel(nn.Module):
             state_i = tuple(s[i:i+1] for s in state)
             images_i = images[i:i+1]
             selected_words = None
+            cur_beam_size = beam_size
 
             outputs_i = []
             logprobs_i = []
-            tmp_outputs_i = [[] for _ in range(beam_size)]
+            tmp_outputs_i = [[] for _ in range(cur_beam_size)]
             seq_logprob = .0
             for t in range(seq_len):
                 word_logprob, state_i = self.step(t, state_i, selected_words, images_i, mode='beam_search')
                 seq_logprob = seq_logprob + word_logprob
                 selected_logprob, selected_idx = torch.sort(seq_logprob.view(-1), -1, descending=True)
-                selected_logprob, selected_idx = selected_logprob[:beam_size], selected_idx[:beam_size]
+                selected_logprob, selected_idx = selected_logprob[:cur_beam_size], selected_idx[:cur_beam_size]
 
                 selected_beam = selected_idx / word_logprob.shape[1]
                 selected_words = selected_idx - selected_beam*word_logprob.shape[1]
@@ -70,7 +71,7 @@ class CaptioningModel(nn.Module):
                 # Update outputs with sequences that reached EOS
                 outputs_i.extend([tmp_outputs_i[x.item()] for x in torch.masked_select(selected_beam, selected_words == eos_idx)])
                 logprobs_i.extend([x.item() for x in torch.masked_select(selected_logprob, selected_words == eos_idx)])
-                beam_size -= torch.sum(selected_words == eos_idx).item()
+                cur_beam_size -= torch.sum(selected_words == eos_idx).item()
 
                 # Remove sequence if it reaches EOS
                 selected_beam = torch.masked_select(selected_beam, selected_words != eos_idx)

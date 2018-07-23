@@ -71,7 +71,7 @@ class FC(CaptioningModel):
         return h0, c0
 
     def step(self, t, state, prev_output, images, seq=None, mode='teacher_forcing'):
-        assert (mode in ['teacher_forcing', 'test'])
+        assert (mode in ['teacher_forcing', 'test', 'beam_search'])
         device = images.device
         b_s = images.size(0)
         if t == 0:
@@ -90,6 +90,8 @@ class FC(CaptioningModel):
                     it = seq[:, t - 1]
             elif mode == 'test':
                 it = torch.max(prev_output, -1)[1]
+            elif mode == 'beam_search':
+                it = prev_output
 
             xt = self.embed(it)
 
