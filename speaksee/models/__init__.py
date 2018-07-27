@@ -1,3 +1,4 @@
 from .CaptioningModel import CaptioningModel
 from .fc import FC
 from .bottomup_topdown_attention import BottomupTopdownAttention
+from .bottomup_topdown_sentinel import BottomupTopdownAttention_Sentinel
