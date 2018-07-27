@@ -151,6 +151,55 @@ class ImageDetectionsField(RawField):
         return precomp_data.astype(np.float32)
 
 
+class ImageAssociatedDetectionsField(RawField):
+    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
+        self.max_detections = 100
+        self.detections_path = detections_path
+        self.detections_file = h5py.File(self.detections_path, 'r')
+        super(ImageAssociatedDetectionsField, self).__init__(preprocessing, postprocessing)
+
+    def preprocess(self, x, avoid_precomp=False):
+        image_id = int(x.split('_')[-1].split('.')[0])
+        try:
+            precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
+        except:
+            precomp_data = np.random.rand(10,2048)
+
+        delta = self.max_detections - precomp_data.shape[0]
+        if delta > 0:
+            precomp_data = np.concatenate([precomp_data, np.zeros((delta, precomp_data.shape[1]))], axis=0)
+        elif delta < 0:
+            precomp_data = precomp_data[:self.max_detections]
+
+        return precomp_data.astype(np.float32)
+
+
+class PadField(RawField):
+    # Con questo usare tokenizer split ' ', o quanto meno controllare che funzioni bene l'associazione con gli id
+    # Per l'IOU fare l'unione delle bbox date
+    # Problema: il Flickr30k entities ha più fields di un paired image dataset
+    def __init__(self, padding_idx, fix_length=None, dtype=torch.long):
+        self.padding_idx = padding_idx
+        self.fix_length = fix_length
+        self.dtype = dtype
+        super(PadField, self).__init__()
+
+    def process(self, minibatch, device=None):
+        minibatch = list(minibatch)
+        if self.fix_length is None:
+            max_len = max(len(x) for x in minibatch)
+        else:
+            max_len = self.fix_length
+
+        padded, lengths = [], []
+        for x in minibatch:
+            padded.append(
+                (x[:max_len]) + [self.padding_idx] * max(0, max_len - len(x)))
+
+        var = torch.tensor(padded, dtype=self.dtype, device=device)
+        return var
+
+
 class TextField(RawField):
     vocab_cls = Vocab
     # Dictionary mapping PyTorch tensor dtypes to the appropriate Python
