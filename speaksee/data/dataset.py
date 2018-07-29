@@ -124,8 +124,7 @@ class Flickr(PairedDataset):
 
 class FlickrEntities(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_file, entities_root):
-        dataset = json.load(open(ann_file, 'r'))['images']
-        self.train_examples, self.val_examples, self.test_examples = self.get_samples(dataset, img_root, entities_root)
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file, img_root, entities_root)
         examples = self.train_examples + self.val_examples + self.test_examples
         super(FlickrEntities, self).__init__(examples, image_field, text_field)
 
@@ -137,25 +136,25 @@ class FlickrEntities(PairedDataset):
         return train_split, val_split, test_split
 
     @classmethod
-    def get_samples(cls, dataset, img_root, entities_root):
+    def get_samples(cls, ann_file, img_root, entities_root):
         train_samples = []
         val_samples = []
         test_samples = []
 
         prog = re.compile(r'([^\[\]]*)(\[[^\[\]]+\])([^\[\]]*)')
 
+        dataset = json.load(open(ann_file, 'r'))['images']
         for d in dataset:
             filename = d['filename']
             split = d['split']
-            xml_root = xml.etree.ElementTree.parse(os.path.join(entities_root, 'Annotations', filename.replace('.jpg', '.xml'))).getroot()
+            xml_root = xml.etree.ElementTree.parse(os.path.join(entities_root, 'Annotations',
+                                                                filename.replace('.jpg', '.xml'))).getroot()
             det_dict = dict()
             id_counter = 1
             for obj in xml_root.findall('object'):
                 obj_names = [o.text for o in obj.findall('name')]
                 if obj.find('bndbox'):
-                    bbox = []
-                    for x in obj.find('bndbox'):
-                        bbox.append(int(x.text))
+                    bbox = [int(o.text) for o in obj.find('bndbox')]
                     for obj_name in obj_names:
                         if obj_name not in det_dict:
                             det_dict[obj_name] = {'id': id_counter, 'bdnbox': [bbox]}
@@ -167,7 +166,8 @@ class FlickrEntities(PairedDataset):
             for it in det_dict.values():
                 bdnboxes[it['id'] - 1] = it['bdnbox']
 
-            captions = [f.strip() for f in open(os.path.join(entities_root, 'Sentences', filename.replace('.jpg', '.txt'))).readlines()]
+            captions = [l.strip() for l in open(os.path.join(entities_root, 'Sentences',
+                                                             filename.replace('.jpg', '.txt'))).readlines()]
 
             for c in captions:
                 matches = prog.findall(c)
@@ -176,7 +176,7 @@ class FlickrEntities(PairedDataset):
 
                 for match in matches:
                     for i, grp in enumerate(match):
-                        if i == 0 or i == 2:
+                        if i in (0, 2):
                             if grp != '':
                                 words = grp.strip().split(' ')
                                 for w in words:
