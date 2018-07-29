@@ -8,6 +8,7 @@ from . import field
 from .example import Example
 from ..utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
+from pathos.multiprocessing import ProcessingPool as Pool
 
 
 class Dataset(object):
@@ -117,10 +118,12 @@ class Flickr(PairedDataset):
 
 
 class FlickrEntities(PairedDataset):
-    def __init__(self, image_field, text_field, img_root, ann_file, entities_root):
+    def __init__(self, image_field, text_field, det_ids_field, img_root, ann_file, entities_root, multiprocess=True):
+        self.multiprocess = multiprocess
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file, img_root, entities_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(FlickrEntities, self).__init__(examples, {'image': image_field, 'text': text_field})
+        super(FlickrEntities, self).__init__(examples, {'image': image_field, 'text': text_field,
+                                                        'det_ids': det_ids_field})
 
     @property
     def splits(self):
@@ -129,16 +132,9 @@ class FlickrEntities(PairedDataset):
         test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
-    @classmethod
-    def get_samples(cls, ann_file, img_root, entities_root):
-        train_samples = []
-        val_samples = []
-        test_samples = []
 
-        prog = re.compile(r'([^\[\]]*)(\[[^\[\]]+\])([^\[\]]*)')
-
-        dataset = json.load(open(ann_file, 'r'))['images']
-        for d in dataset:
+    def get_samples(self, ann_file, img_root, entities_root):
+        def _get_sample(d):
             filename = d['filename']
             split = d['split']
             xml_root = xml.etree.ElementTree.parse(os.path.join(entities_root, 'Annotations',
@@ -148,7 +144,7 @@ class FlickrEntities(PairedDataset):
             for obj in xml_root.findall('object'):
                 obj_names = [o.text for o in obj.findall('name')]
                 if obj.find('bndbox'):
-                    bbox = [int(o.text) for o in obj.find('bndbox')]
+                    bbox = tuple(int(o.text) for o in obj.find('bndbox'))
                     for obj_name in obj_names:
                         if obj_name not in det_dict:
                             det_dict[obj_name] = {'id': id_counter, 'bdnbox': [bbox]}
@@ -158,7 +154,8 @@ class FlickrEntities(PairedDataset):
 
             bdnboxes = [[] for _ in range(id_counter - 1)]
             for it in det_dict.values():
-                bdnboxes[it['id'] - 1] = it['bdnbox']
+                bdnboxes[it['id'] - 1] = tuple(it['bdnbox'])
+            bdnboxes = tuple(bdnboxes)
 
             captions = [l.strip() for l in open(os.path.join(entities_root, 'Sentences',
                                                              filename.replace('.jpg', '.txt'))).readlines()]
@@ -190,17 +187,34 @@ class FlickrEntities(PairedDataset):
                                         det_ids.append(0)
 
                 caption = ' '.join(caption)
-                example = Example.fromdict({'image': os.path.join(img_root, filename),
+                example = Example.fromdict({'image': (os.path.join(img_root, filename), bdnboxes),
                                             'text': caption,
-                                            'bndbox': bdnboxes,
                                             'det_ids': det_ids})
 
-                if split == 'train':
-                    train_samples.append(example)
-                elif split == 'val':
-                    val_samples.append(example)
-                elif split == 'test':
-                    test_samples.append(example)
+                return example, split
+
+        train_samples = []
+        val_samples = []
+        test_samples = []
+
+        prog = re.compile(r'([^\[\]]*)(\[[^\[\]]+\])([^\[\]]*)')
+        dataset = json.load(open(ann_file, 'r'))['images']
+
+        if self.multiprocess:
+            pool = Pool()
+            samples = pool.map(_get_sample, dataset)
+        else:
+            samples = []
+            for d in dataset:
+                samples.append(self._get_sample(d, entities_root, prog, img_root))
+
+        for example, split in samples:
+            if split == 'train':
+                train_samples.append(example)
+            elif split == 'val':
+                val_samples.append(example)
+            elif split == 'test':
+                test_samples.append(example)
 
         return train_samples, val_samples, test_samples
 

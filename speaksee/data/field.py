@@ -155,32 +155,59 @@ class ImageAssociatedDetectionsField(RawField):
     def __init__(self, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
-        self.detections_file = h5py.File(self.detections_path, 'r')
         super(ImageAssociatedDetectionsField, self).__init__(None, postprocessing)
 
+    @staticmethod
+    def _bb_intersection_over_union(boxA, boxB):
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+
+        interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+
+        boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+        boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+        iou = interArea / (boxAArea + boxBArea - interArea)
+        return iou
+
     def preprocess(self, x, avoid_precomp=False):
-        image_id = int(x.split('_')[-1].split('.')[0])
-        try:
-            precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
-        except:
-            precomp_data = np.random.rand(10,2048)
+        image = x[0]
+        gt_bboxes_set = x[1]
 
-        delta = self.max_detections - precomp_data.shape[0]
-        if delta > 0:
-            precomp_data = np.concatenate([precomp_data, np.zeros((delta, precomp_data.shape[1]))], axis=0)
-        elif delta < 0:
-            precomp_data = precomp_data[:self.max_detections]
+        id_image = image.split('/')[-1].split('.')[0]
+        f = h5py.File(self.detections_path, 'r')
 
-        return precomp_data.astype(np.float32)
+        det_bboxes = f['%s_boxes' % id_image]
+        det_features = f['%s_features' % id_image]
+        feature_dim = det_features.shape[-1]
+        features = np.zeros((self.max_detections, feature_dim))
+
+        for i, bboxes in enumerate(gt_bboxes_set[:self.max_detections]):
+            overall_bbox = [min(b[0] for b in bboxes),
+                      min(b[1] for b in bboxes),
+                      max(b[2] for b in bboxes),
+                      max(b[3] for b in bboxes)]
+
+            id_bbox = -1
+            iou_max = 0
+            for k, det_bbox in enumerate(det_bboxes):
+                iou = self._bb_intersection_over_union(overall_bbox, det_bbox)
+                if iou_max < iou:
+                    id_bbox = k
+                    iou_max = iou
+
+            features[i] = np.asarray(det_features[id_bbox])
+
+        return features.astype(np.float32)
 
 
 class PadField(RawField):
-    # Con questo usare tokenizer split ' ', o quanto meno controllare che funzioni bene l'associazione con gli id
-    # Per l'IOU fare l'unione delle bbox date
-    # Problema: il Flickr30k entities ha più fields di un paired image dataset
-    def __init__(self, padding_idx, fix_length=None, dtype=torch.long):
+    def __init__(self, padding_idx, fix_length=None, pad_init=True, pad_eos=True, dtype=torch.long):
         self.padding_idx = padding_idx
         self.fix_length = fix_length
+        self.init_token = padding_idx if pad_init else None
+        self.eos_token = padding_idx if pad_eos else None
         self.dtype = dtype
         super(PadField, self).__init__()
 
@@ -189,12 +216,15 @@ class PadField(RawField):
         if self.fix_length is None:
             max_len = max(len(x) for x in minibatch)
         else:
-            max_len = self.fix_length
-
+            max_len = self.fix_length + (
+                self.init_token, self.eos_token).count(None) - 2
         padded, lengths = [], []
         for x in minibatch:
             padded.append(
-                (x[:max_len]) + [self.padding_idx] * max(0, max_len - len(x)))
+                ([] if self.init_token is None else [self.init_token]) +
+                list(x[:max_len]) +
+                ([] if self.eos_token is None else [self.eos_token]) +
+                [self.padding_idx] * max(0, max_len - len(x)))
 
         var = torch.tensor(padded, dtype=self.dtype, device=device)
         return var

@@ -17,5 +17,6 @@ setup(name='speaksee',
           'requests',
           'pycocotools',
           'matplotlib',
+          'pathos',
       ],
       zip_safe=False)
