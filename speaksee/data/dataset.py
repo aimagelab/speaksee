@@ -50,18 +50,12 @@ class Dataset(object):
 
 
 class PairedDataset(Dataset):
-    def __init__(self, examples, image_field, text_field):
-        """
-
-        Args:
-            examples: a list of tuples
-            image_field:
-            text_field:
-        """
-        super(PairedDataset, self).__init__(examples, {'image': image_field,
-                                             'text': text_field})
-        self.image_field = image_field
-        self.text_field = text_field
+    def __init__(self, examples, fields):
+        assert('image' in fields)
+        assert('text' in fields)
+        super(PairedDataset, self).__init__(examples, fields)
+        self.image_field = self.fields['image']
+        self.text_field = self.fields['text']
         self.image_children = defaultdict(set)
         self.text_children = defaultdict(set)
         for e in self.examples:
@@ -90,13 +84,13 @@ class Flickr(PairedDataset):
         dataset = json.load(open(ann_file, 'r'))['images']
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(dataset, img_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(Flickr, self).__init__(examples, image_field, text_field)
+        super(Flickr, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -126,13 +120,13 @@ class FlickrEntities(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_file, entities_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file, img_root, entities_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(FlickrEntities, self).__init__(examples, image_field, text_field)
+        super(FlickrEntities, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -251,13 +245,13 @@ class COCO(PairedDataset):
         with nostdout():
             self.train_examples, self.val_examples, self.test_examples = self.get_samples(roots, ids)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(COCO, self).__init__(examples, image_field, text_field)
+        super(COCO, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -314,13 +308,13 @@ class CUB200(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_root, split_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(CUB200, self).__init__(examples, image_field, text_field)
+        super(CUB200, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -355,13 +349,13 @@ class Oxford102(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_root, split_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(Oxford102, self).__init__(examples, image_field, text_field)
+        super(Oxford102, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -395,13 +389,13 @@ class TabularDataset(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_file_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file_root, img_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(TabularDataset, self).__init__(examples, image_field, text_field)
+        super(TabularDataset, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
