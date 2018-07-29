@@ -125,7 +125,7 @@ class ImageField(RawField):
 
 
 class ImageDetectionsField(RawField):
-    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
+    def __init__(self, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
         self.detections_file = h5py.File(self.detections_path, 'r')
@@ -133,7 +133,7 @@ class ImageDetectionsField(RawField):
         for key in self.detections_file.keys():
             self.detections[key] = self.detections_file[key][()]
 
-        super(ImageDetectionsField, self).__init__(preprocessing, postprocessing)
+        super(ImageDetectionsField, self).__init__(None, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
@@ -152,11 +152,11 @@ class ImageDetectionsField(RawField):
 
 
 class ImageAssociatedDetectionsField(RawField):
-    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
+    def __init__(self, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
         self.detections_file = h5py.File(self.detections_path, 'r')
-        super(ImageAssociatedDetectionsField, self).__init__(preprocessing, postprocessing)
+        super(ImageAssociatedDetectionsField, self).__init__(None, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
