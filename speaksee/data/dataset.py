@@ -1,10 +1,16 @@
 import os
 import json
 import numpy as np
-from collections import defaultdict
+import re
+import itertools
+import collections
+import torch
+import xml.etree.ElementTree
+from . import field
 from .example import Example
 from ..utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
+from pathos.multiprocessing import ProcessingPool as Pool
 
 
 class Dataset(object):
@@ -18,7 +24,7 @@ class Dataset(object):
             tensors = []
             for field, data in zip(self.fields.values(), batch):
                 tensor = field.process(data)
-                if isinstance(tensor, tuple) or isinstance(tensor, list):
+                if isinstance(tensor, collections.Sequence) and any(isinstance(t, torch.Tensor) for t in tensor):
                     tensors.extend(tensor)
                 else:
                     tensors.append(tensor)
@@ -27,6 +33,7 @@ class Dataset(object):
                 return tensors
             else:
                 return tensors[0]
+
         return collate
 
     def __getitem__(self, i):
@@ -46,21 +53,76 @@ class Dataset(object):
                 yield getattr(x, attr)
 
 
-class PairedDataset(Dataset):
-    def __init__(self, examples, image_field, text_field):
-        """
+class DictionaryDataset(Dataset):
+    def __init__(self, examples, fields, key_fields):
+        if not isinstance(key_fields, (tuple, list)):
+            key_fields = (key_fields,)
+        for field in key_fields:
+            assert (field in fields)
 
-        Args:
-            examples: a list of tuples
-            image_field:
-            text_field:
-        """
-        super(PairedDataset, self).__init__(examples, {'image': image_field,
-                                             'text': text_field})
-        self.image_field = image_field
-        self.text_field = text_field
-        self.image_children = defaultdict(set)
-        self.text_children = defaultdict(set)
+        self.dictionary = collections.defaultdict(list)
+        key_fields = {k: fields[k] for k in key_fields}
+        value_fields = {k: fields[k] for k in fields.keys() if k not in key_fields}
+        key_examples = []
+        key_dict = dict()
+        value_examples = []
+
+        for i, e in enumerate(examples):
+            key_example = Example.fromdict({k: getattr(e, k) for k in key_fields})
+            value_example = Example.fromdict({v: getattr(e, v) for v in value_fields})
+            if key_example not in key_dict:
+                key_dict[key_example] = len(key_examples)
+                key_examples.append(key_example)
+
+            value_examples.append(value_example)
+            self.dictionary[key_dict[key_example]].append(i)
+
+        self.key_dataset = Dataset(key_examples, key_fields)
+        self.value_dataset = Dataset(value_examples, value_fields)
+        super(DictionaryDataset, self).__init__(examples, fields)
+
+    def collate_fn(self):
+        def collate(batch):
+            key_batch, value_batch = list(zip(*batch))
+            key_tensors = self.key_dataset.collate_fn()(key_batch)
+
+            value_batch_flattened = list(itertools.chain(*value_batch))
+            value_tensors_flattened = self.value_dataset.collate_fn()(value_batch_flattened)
+
+            lengths = [0, ] + list(itertools.accumulate([len(x) for x in value_batch]))
+            if isinstance(value_tensors_flattened, collections.Sequence) \
+                    and any(isinstance(t, torch.Tensor) for t in value_tensors_flattened):
+                value_tensors = [[vt[s:e] for (s, e) in zip(lengths[:-1], lengths[1:])] for vt in value_tensors_flattened]
+            else:
+                value_tensors = [value_tensors_flattened[s:e] for (s, e) in zip(lengths[:-1], lengths[1:])]
+
+            return key_tensors, value_tensors
+
+        return collate
+
+    def __getitem__(self, i):
+        key_data = self.key_dataset[i]
+
+        values_data = []
+        for idx in self.dictionary[i]:
+            value_data = self.value_dataset[idx]
+            values_data.append(value_data)
+
+        return key_data, values_data
+
+    def __len__(self):
+        return len(self.key_dataset)
+
+
+class PairedDataset(Dataset):
+    def __init__(self, examples, fields):
+        assert ('image' in fields)
+        assert ('text' in fields)
+        super(PairedDataset, self).__init__(examples, fields)
+        self.image_field = self.fields['image']
+        self.text_field = self.fields['text']
+        self.image_children = collections.defaultdict(set)
+        self.text_children = collections.defaultdict(set)
         for e in self.examples:
             self.image_children[e.image].add(e.text)
             self.text_children[e.text].add(e.image)
@@ -87,13 +149,13 @@ class Flickr(PairedDataset):
         dataset = json.load(open(ann_file, 'r'))['images']
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(dataset, img_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(Flickr, self).__init__(examples, image_field, text_field)
+        super(Flickr, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -159,13 +221,13 @@ class COCO(PairedDataset):
         with nostdout():
             self.train_examples, self.val_examples, self.test_examples = self.get_samples(roots, ids)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(COCO, self).__init__(examples, image_field, text_field)
+        super(COCO, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -222,13 +284,13 @@ class CUB200(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_root, split_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(CUB200, self).__init__(examples, image_field, text_field)
+        super(CUB200, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -263,13 +325,13 @@ class Oxford102(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_root, split_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(Oxford102, self).__init__(examples, image_field, text_field)
+        super(Oxford102, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
@@ -303,13 +365,13 @@ class TabularDataset(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_file_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file_root, img_root)
         examples = self.train_examples + self.val_examples + self.test_examples
-        super(TabularDataset, self).__init__(examples, image_field, text_field)
+        super(TabularDataset, self).__init__(examples, {'image': image_field, 'text': text_field})
 
     @property
     def splits(self):
-        train_split = PairedDataset(self.train_examples, self.image_field, self.text_field)
-        val_split = PairedDataset(self.val_examples, self.image_field, self.text_field)
-        test_split = PairedDataset(self.test_examples, self.image_field, self.text_field)
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
     @classmethod
