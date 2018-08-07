@@ -154,9 +154,25 @@ class ImageDetectionsField(RawField):
 
 
 class ImageAssociatedDetectionsField(RawField):
-    def __init__(self, postprocessing=None, detections_path=None):
+    def __init__(self, postprocessing=None, detections_path=None, image_features_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
+        self.image_features_path = image_features_path
+        # self.detections_file = h5py.File(self.detections_path, 'r')
+        # self.detections_dict = dict()
+        # for key in self.detections_file.keys():
+        #     self.detections_dict[key] = self.detections_file[key][()]
+
+        img_precomp_file = h5py.File(self.image_features_path, 'r')
+        self.precomp_index = list(img_precomp_file['index'][:])
+        if six.PY3:
+            self.precomp_index = [s.decode('utf-8') for s in self.precomp_index]
+
+        img_precomp_data = img_precomp_file['data']
+        self.image_features_precomp = dict()
+        for key in self.precomp_index:
+            self.image_features_precomp[key] = img_precomp_data[self.precomp_index.index(key)]
+
         super(ImageAssociatedDetectionsField, self).__init__(None, postprocessing)
 
     @staticmethod
@@ -179,9 +195,11 @@ class ImageAssociatedDetectionsField(RawField):
 
         id_image = image.split('/')[-1].split('.')[0]
         f = h5py.File(self.detections_path, 'r')
-
         det_bboxes = f['%s_boxes' % id_image]
         det_features = f['%s_features' % id_image]
+
+        # det_bboxes = self.detections_dict['%s_boxes' % id_image]
+        # det_features = self.detections_dict['%s_features' % id_image]
         feature_dim = det_features.shape[-1]
         features = np.zeros((self.max_detections, feature_dim))
 
@@ -201,7 +219,7 @@ class ImageAssociatedDetectionsField(RawField):
 
             features[i] = np.asarray(det_features[id_bbox])
 
-        return features.astype(np.float32)
+        return features.astype(np.float32), self.image_features_precomp[image]
 
 
 class PadField(RawField):
