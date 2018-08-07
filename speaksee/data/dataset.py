@@ -4,6 +4,7 @@ import numpy as np
 import re
 import itertools
 import collections
+import torch
 import xml.etree.ElementTree
 from . import field
 from .example import Example
@@ -23,7 +24,7 @@ class Dataset(object):
             tensors = []
             for field, data in zip(self.fields.values(), batch):
                 tensor = field.process(data)
-                if isinstance(tensor, tuple) or isinstance(tensor, list):
+                if isinstance(tensor, (tuple, list)) and isinstance(tensor[0], torch.Tensor):
                     tensors.extend(tensor)
                 else:
                     tensors.append(tensor)
