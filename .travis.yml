@@ -12,6 +12,7 @@ matrix:
   allow_failures:
     - env: LINT_CHECK
       python: "2.7"
+    - python: "2.7"
 
 install:
   - sudo apt-get update
