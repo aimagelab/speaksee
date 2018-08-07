@@ -132,7 +132,6 @@ class FlickrEntities(PairedDataset):
         test_split = PairedDataset(self.test_examples, self.fields)
         return train_split, val_split, test_split
 
-
     def get_samples(self, ann_file, img_root, entities_root):
         def _get_sample(d):
             filename = d['filename']
@@ -159,7 +158,7 @@ class FlickrEntities(PairedDataset):
 
             captions = [l.strip() for l in open(os.path.join(entities_root, 'Sentences',
                                                              filename.replace('.jpg', '.txt'))).readlines()]
-
+            outputs = []
             for c in captions:
                 matches = prog.findall(c)
                 caption = []
@@ -187,11 +186,13 @@ class FlickrEntities(PairedDataset):
                                         det_ids.append(0)
 
                 caption = ' '.join(caption)
-                example = Example.fromdict({'image': (os.path.join(img_root, filename), bdnboxes),
-                                            'text': caption,
-                                            'det_ids': det_ids})
+                if caption != '' and np.sum(np.asarray(det_ids)) > 0:
+                    example = Example.fromdict({'image': (os.path.join(img_root, filename), bdnboxes),
+                                                'text': caption,
+                                                'det_ids': det_ids})
+                    outputs.append([example, split])
 
-                return example, split
+            return outputs
 
         train_samples = []
         val_samples = []
@@ -203,10 +204,11 @@ class FlickrEntities(PairedDataset):
         if self.multiprocess:
             pool = Pool()
             samples = pool.map(_get_sample, dataset)
+            samples = [item for sublist in samples for item in sublist]
         else:
             samples = []
             for d in dataset:
-                samples.append(self._get_sample(d, entities_root, prog, img_root))
+                samples.extend(_get_sample(d))
 
         for example, split in samples:
             if split == 'train':
