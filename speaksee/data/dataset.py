@@ -24,7 +24,7 @@ class Dataset(object):
             tensors = []
             for field, data in zip(self.fields.values(), batch):
                 tensor = field.process(data)
-                if isinstance(tensor, (tuple, list)) and isinstance(tensor[0], torch.Tensor):
+                if isinstance(tensor, collections.Sequence) and any(isinstance(t, torch.Tensor) for t in tensor):
                     tensors.extend(tensor)
                 else:
                     tensors.append(tensor)
@@ -33,6 +33,7 @@ class Dataset(object):
                 return tensors
             else:
                 return tensors[0]
+
         return collate
 
     def __getitem__(self, i):
@@ -51,12 +52,13 @@ class Dataset(object):
             for x in self.examples:
                 yield getattr(x, attr)
 
+
 class DictionaryDataset(Dataset):
     def __init__(self, examples, fields, key_fields):
         if not isinstance(key_fields, (tuple, list)):
             key_fields = (key_fields,)
         for field in key_fields:
-            assert(field in fields)
+            assert (field in fields)
 
         self.dictionary = collections.defaultdict(list)
         key_fields = {k: fields[k] for k in key_fields}
@@ -88,11 +90,15 @@ class DictionaryDataset(Dataset):
             value_tensors_flattened = self.value_dataset.collate_fn()(value_batch_flattened)
 
             lengths = [0, ] + list(itertools.accumulate([len(x) for x in value_batch]))
-            value_tensors = [value_tensors_flattened[s:e] for (s,e) in zip(lengths[:-1], lengths[1:])]
+            if isinstance(value_tensors_flattened, collections.Sequence) \
+                    and any(isinstance(t, torch.Tensor) for t in value_tensors_flattened):
+                value_tensors = [[vt[s:e] for (s, e) in zip(lengths[:-1], lengths[1:])] for vt in value_tensors_flattened]
+            else:
+                value_tensors = [value_tensors_flattened[s:e] for (s, e) in zip(lengths[:-1], lengths[1:])]
 
             return key_tensors, value_tensors
-        return collate
 
+        return collate
 
     def __getitem__(self, i):
         key_data = self.key_dataset[i]
@@ -107,10 +113,11 @@ class DictionaryDataset(Dataset):
     def __len__(self):
         return len(self.key_dataset)
 
+
 class PairedDataset(Dataset):
     def __init__(self, examples, fields):
-        assert('image' in fields)
-        assert('text' in fields)
+        assert ('image' in fields)
+        assert ('text' in fields)
         super(PairedDataset, self).__init__(examples, fields)
         self.image_field = self.fields['image']
         self.text_field = self.fields['text']
