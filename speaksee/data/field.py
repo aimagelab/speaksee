@@ -128,19 +128,21 @@ class ImageDetectionsField(RawField):
     def __init__(self, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
-        self.detections_file = h5py.File(self.detections_path, 'r')
-        self.detections = dict()
-        for key in self.detections_file.keys():
-            self.detections[key] = self.detections_file[key][()]
+        # self.detections_file = h5py.File(self.detections_path, 'r')
+        # self.detections = dict()
+        # for key in self.detections_file.keys():
+        #     self.detections[key] = self.detections_file[key][()]
 
         super(ImageDetectionsField, self).__init__(None, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
+        det_file = h5py.File(self.detections_path, 'r')
         try:
-            precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
+            # precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
+            precomp_data = det_file['%d' % image_id]
         except:
-            precomp_data = np.random.rand(10,2048)
+            precomp_data = np.random.rand(10, 2048)
 
         delta = self.max_detections - precomp_data.shape[0]
         if delta > 0:
