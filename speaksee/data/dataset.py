@@ -2,7 +2,8 @@ import os
 import json
 import numpy as np
 import re
-from collections import defaultdict
+import itertools
+import collections
 import xml.etree.ElementTree
 from . import field
 from .example import Example
@@ -49,6 +50,58 @@ class Dataset(object):
             for x in self.examples:
                 yield getattr(x, attr)
 
+class DictionaryDataset(Dataset):
+    def __init__(self, examples, fields, key_fields):
+        if not isinstance(key_fields, (tuple, list)):
+            key_fields = (key_fields,)
+        for field in key_fields:
+            assert(field in fields)
+
+        self.dictionary = collections.defaultdict(list)
+        key_fields = {k: fields[k] for k in key_fields}
+        value_fields = {k: fields[k] for k in fields.keys() if k not in key_fields}
+        key_examples = []
+        value_examples = []
+
+        for i, e in enumerate(examples):
+            key_example = Example.fromdict({k: getattr(e, k) for k in key_fields})
+            value_example = Example.fromdict({v: getattr(e, v) for v in value_fields})
+            if key_example not in key_examples:
+                key_examples.append(key_example)
+            value_examples.append(value_example)
+            self.dictionary[key_examples.index(key_example)].append(i)
+
+        self.key_dataset = Dataset(key_examples, key_fields)
+        self.value_dataset = Dataset(value_examples, value_fields)
+        super(DictionaryDataset, self).__init__(examples, fields)
+
+    def collate_fn(self):
+        def collate(batch):
+            key_batch, value_batch = list(zip(*batch))
+            key_tensors = self.key_dataset.collate_fn()(key_batch)
+
+            value_batch_flattened = list(itertools.chain(*value_batch))
+            value_tensors_flattened = self.value_dataset.collate_fn()(value_batch_flattened)
+
+            lengths = [0, ] + list(itertools.accumulate([len(x) for x in value_batch]))
+            value_tensors = [value_tensors_flattened[s:e] for (s,e) in zip(lengths[:-1], lengths[1:])]
+
+            return key_tensors, value_tensors
+        return collate
+
+
+    def __getitem__(self, i):
+        key_data = self.key_dataset[i]
+
+        values_data = []
+        for idx in self.dictionary[i]:
+            value_data = self.value_dataset[idx]
+            values_data.append(value_data)
+
+        return key_data, values_data
+
+    def __len__(self):
+        return len(self.key_dataset)
 
 class PairedDataset(Dataset):
     def __init__(self, examples, fields):
@@ -57,8 +110,8 @@ class PairedDataset(Dataset):
         super(PairedDataset, self).__init__(examples, fields)
         self.image_field = self.fields['image']
         self.text_field = self.fields['text']
-        self.image_children = defaultdict(set)
-        self.text_children = defaultdict(set)
+        self.image_children = collections.defaultdict(set)
+        self.text_children = collections.defaultdict(set)
         for e in self.examples:
             self.image_children[e.image].add(e.text)
             self.text_children[e.text].add(e.image)
