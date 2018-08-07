@@ -61,15 +61,18 @@ class DictionaryDataset(Dataset):
         key_fields = {k: fields[k] for k in key_fields}
         value_fields = {k: fields[k] for k in fields.keys() if k not in key_fields}
         key_examples = []
+        key_dict = dict()
         value_examples = []
 
         for i, e in enumerate(examples):
             key_example = Example.fromdict({k: getattr(e, k) for k in key_fields})
             value_example = Example.fromdict({v: getattr(e, v) for v in value_fields})
-            if key_example not in key_examples:
+            if key_example not in key_dict:
+                key_dict[key_example] = len(key_examples)
                 key_examples.append(key_example)
+
             value_examples.append(value_example)
-            self.dictionary[key_examples.index(key_example)].append(i)
+            self.dictionary[key_dict[key_example]].append(i)
 
         self.key_dataset = Dataset(key_examples, key_fields)
         self.value_dataset = Dataset(value_examples, value_fields)
