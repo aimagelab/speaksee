@@ -91,17 +91,17 @@ class BottomupTopdownAttention_Sentinel(CaptioningModel):
             xt = self.embed(it)
 
             input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
-            s_gate = F.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
+            s_gate = torch.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            s_t = s_gate * F.tanh(state_1[1])
+            s_t = s_gate * torch.tanh(state_1[1])
             s_t = F.relu(self.s_fc(s_t))
 
-            det_weights = F.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
+            det_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
             det_weights = self.att_a(det_weights)
             det_weights = (1-detections_mask)*-9e9 + detections_mask*det_weights
 
-            sent_weights = F.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
+            sent_weights = torch.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
             sent_weights = self.att_a(sent_weights).unsqueeze(1)
 
             att_weights = F.softmax(torch.cat([det_weights, sent_weights], 1), 1)
@@ -134,17 +134,17 @@ class BottomupTopdownAttention_Sentinel(CaptioningModel):
             xt = self.embed(it)
 
             input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
-            s_gate = F.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
+            s_gate = torch.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            s_t = s_gate * F.tanh(state_1[1])
+            s_t = s_gate * torch.tanh(state_1[1])
             s_t = F.relu(self.s_fc(s_t))
 
-            det_weights = F.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
+            det_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
             det_weights = self.att_a(det_weights)
             det_weights = (1 - detections_mask) * -9e9 + detections_mask * det_weights
 
-            sent_weights = F.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
+            sent_weights = torch.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
             sent_weights = self.att_a(sent_weights).unsqueeze(1)
 
             att_weights = F.softmax(torch.cat([det_weights, sent_weights], 1), 1)

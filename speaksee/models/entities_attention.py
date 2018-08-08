@@ -104,10 +104,10 @@ class EntitiesAttention(CaptioningModel):
             xt = self.embed(it)
 
             input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
-            s_gate = F.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
+            s_gate = torch.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            s_t = s_gate * F.tanh(state_1[1])
+            s_t = s_gate * torch.tanh(state_1[1])
             s_t = F.relu(self.s_fc(s_t))
 
             regions = torch.cat([s_t.unsqueeze(1), detections], 1)
@@ -153,10 +153,10 @@ class EntitiesAttention(CaptioningModel):
             xt = self.embed(it)
 
             input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
-            s_gate = F.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
+            s_gate = torch.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            s_t = s_gate * F.tanh(state_1[1])
+            s_t = s_gate * torch.tanh(state_1[1])
             s_t = F.relu(self.s_fc(s_t))
 
             regions = torch.cat([s_t.unsqueeze(1), detections], 1)
@@ -267,20 +267,20 @@ class EntitiesAttentionImproved(CaptioningModel):
             xt = self.embed(it)
 
             input_1 = torch.cat([state_2[0], image_descriptor, xt], 1)
-            s_gate = F.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
+            s_gate = torch.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            s_t = s_gate * F.tanh(state_1[1])
+            s_t = s_gate * torch.tanh(state_1[1])
             s_t = self.s_fc(s_t)
 
             regions = torch.cat([s_t.unsqueeze(1), detections], 1)
 
             det_curr, det_next = update_loop(b_s, regions, device, t, seq_len, det_ids)
 
-            det_weights = F.tanh(self.att_va(det_curr) + self.att_ha(state_1[0]).unsqueeze(1))
+            det_weights = torch.tanh(self.att_va(det_curr) + self.att_ha(state_1[0]).unsqueeze(1))
             det_weights = self.att_a(det_weights)
 
-            sent_weights = F.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
+            sent_weights = torch.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
             sent_weights = self.att_a(sent_weights).unsqueeze(1)
 
             att_weights = F.softmax(torch.cat([sent_weights, det_weights], 1), 1)
@@ -329,10 +329,10 @@ class EntitiesAttentionImproved(CaptioningModel):
             xt = self.embed(it)
 
             input_1 = torch.cat([state_2[0], image_descriptor, xt], 1)
-            s_gate = F.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
+            s_gate = torch.sigmoid(self.W1_is(input_1) + self.W1_hs(state_1[0]))
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            s_t = s_gate * F.tanh(state_1[1])
+            s_t = s_gate * torch.tanh(state_1[1])
             s_t = self.s_fc(s_t)
 
             regions = torch.cat([s_t.unsqueeze(1), detections], 1)
@@ -357,10 +357,10 @@ class EntitiesAttentionImproved(CaptioningModel):
                 # elif prev_selection[i] == 1:
                 #     pass
 
-            det_weights = F.tanh(self.att_va(det_curr) + self.att_ha(state_1[0]).unsqueeze(1))
+            det_weights = torch.tanh(self.att_va(det_curr) + self.att_ha(state_1[0]).unsqueeze(1))
             det_weights = self.att_a(det_weights)
 
-            sent_weights = F.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
+            sent_weights = torch.tanh(self.att_s(s_t) + self.att_ha(state_1[0]))
             sent_weights = self.att_a(sent_weights).unsqueeze(1)
 
             att_weights = F.softmax(torch.cat([sent_weights, det_weights], 1), 1)
