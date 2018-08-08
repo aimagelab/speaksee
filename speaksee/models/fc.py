@@ -28,12 +28,12 @@ class LSTMCell(nn.Module):
 
     def forward(self, xt, state):
         all_input_sums = self.i2h(xt) + self.h2h(state[0])
-        sigmoid_chunk = F.sigmoid(all_input_sums[:, :3 * self.hidden_size])
+        sigmoid_chunk = torch.sigmoid(all_input_sums[:, :3 * self.hidden_size])
         it, ft, ot = sigmoid_chunk.split(self.hidden_size, 1)
         maxout = torch.max(all_input_sums[:, 3 * self.hidden_size:4 * self.hidden_size],
                            all_input_sums[:, 4 * self.hidden_size:])
         ct = it * maxout + ft * state[1]
-        ht = ot * F.tanh(ct)
+        ht = ot * torch.tanh(ct)
         ht = self.dropout(ht)
 
         output = ht
