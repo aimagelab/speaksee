@@ -181,6 +181,110 @@ class Flickr(PairedDataset):
         return train_samples, val_samples, test_samples
 
 
+class FlickrEntities(PairedDataset):
+    def __init__(self, image_field, text_field, det_ids_field, img_root, ann_file, entities_root, multiprocess=True):
+        self.multiprocess = multiprocess
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file, img_root, entities_root)
+        examples = self.train_examples + self.val_examples + self.test_examples
+        super(FlickrEntities, self).__init__(examples, {'image': image_field, 'text': text_field,
+                                                        'det_ids': det_ids_field})
+
+    @property
+    def splits(self):
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
+        return train_split, val_split, test_split
+
+    def get_samples(self, ann_file, img_root, entities_root):
+        def _get_sample(d):
+            filename = d['filename']
+            split = d['split']
+            xml_root = xml.etree.ElementTree.parse(os.path.join(entities_root, 'Annotations',
+                                                                filename.replace('.jpg', '.xml'))).getroot()
+            det_dict = dict()
+            id_counter = 1
+            for obj in xml_root.findall('object'):
+                obj_names = [o.text for o in obj.findall('name')]
+                if obj.find('bndbox'):
+                    bbox = tuple(int(o.text) for o in obj.find('bndbox'))
+                    for obj_name in obj_names:
+                        if obj_name not in det_dict:
+                            det_dict[obj_name] = {'id': id_counter, 'bdnbox': [bbox]}
+                            id_counter += 1
+                        else:
+                            det_dict[obj_name]['bdnbox'].append(bbox)
+
+            bdnboxes = [[] for _ in range(id_counter - 1)]
+            for it in det_dict.values():
+                bdnboxes[it['id'] - 1] = tuple(it['bdnbox'])
+            bdnboxes = tuple(bdnboxes)
+
+            captions = [l.strip() for l in open(os.path.join(entities_root, 'Sentences',
+                                                             filename.replace('.jpg', '.txt'))).readlines()]
+            outputs = []
+            for c in captions:
+                matches = prog.findall(c)
+                caption = []
+                det_ids = []
+
+                for match in matches:
+                    for i, grp in enumerate(match):
+                        if i in (0, 2):
+                            if grp != '':
+                                words = grp.strip().split(' ')
+                                for w in words:
+                                    if w not in field.TextField.punctuations and w != '':
+                                        caption.append(w)
+                                        det_ids.append(0)
+                        elif i == 1:
+                            words = grp[1:-1].strip().split(' ')
+                            obj_name = words[0].split('#')[-1].split('/')[0]
+                            words = words[1:]
+                            for w in words:
+                                if w not in field.TextField.punctuations and w != '':
+                                    caption.append(w)
+                                    if obj_name in det_dict:
+                                        det_ids.append(det_dict[obj_name]['id'])
+                                    else:
+                                        det_ids.append(0)
+
+                caption = ' '.join(caption)
+                if caption != '' and np.sum(np.asarray(det_ids)) > 0:
+                    example = Example.fromdict({'image': (os.path.join(img_root, filename), bdnboxes),
+                                                'text': caption,
+                                                'det_ids': det_ids})
+                    outputs.append([example, split])
+
+            return outputs
+
+        train_samples = []
+        val_samples = []
+        test_samples = []
+
+        prog = re.compile(r'([^\[\]]*)(\[[^\[\]]+\])([^\[\]]*)')
+        dataset = json.load(open(ann_file, 'r'))['images']
+
+        if self.multiprocess:
+            pool = Pool()
+            samples = pool.map(_get_sample, dataset)
+            samples = [item for sublist in samples for item in sublist]
+        else:
+            samples = []
+            for d in dataset:
+                samples.extend(_get_sample(d))
+
+        for example, split in samples:
+            if split == 'train':
+                train_samples.append(example)
+            elif split == 'val':
+                val_samples.append(example)
+            elif split == 'test':
+                test_samples.append(example)
+
+        return train_samples, val_samples, test_samples
+
+
 class COCO(PairedDataset):
     # TODO check correctness of Karpathy's splits.
     # TODO fix behaviour when use_restval=False

@@ -125,22 +125,24 @@ class ImageField(RawField):
 
 
 class ImageDetectionsField(RawField):
-    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
+    def __init__(self, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
-        self.detections_file = h5py.File(self.detections_path, 'r')
-        self.detections = dict()
-        for key in self.detections_file.keys():
-            self.detections[key] = self.detections_file[key][()]
+        # self.detections_file = h5py.File(self.detections_path, 'r')
+        # self.detections = dict()
+        # for key in self.detections_file.keys():
+        #     self.detections[key] = self.detections_file[key][()]
 
-        super(ImageDetectionsField, self).__init__(preprocessing, postprocessing)
+        super(ImageDetectionsField, self).__init__(None, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
+        det_file = h5py.File(self.detections_path, 'r')
         try:
-            precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
+            # precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
+            precomp_data = det_file['%d' % image_id]
         except:
-            precomp_data = np.random.rand(10,2048)
+            precomp_data = np.random.rand(10, 2048)
 
         delta = self.max_detections - precomp_data.shape[0]
         if delta > 0:
@@ -149,6 +151,103 @@ class ImageDetectionsField(RawField):
             precomp_data = precomp_data[:self.max_detections]
 
         return precomp_data.astype(np.float32)
+
+
+class ImageAssociatedDetectionsField(RawField):
+    def __init__(self, postprocessing=None, detections_path=None, image_features_path=None):
+        self.max_detections = 100
+        self.detections_path = detections_path
+        self.image_features_path = image_features_path
+        # self.detections_file = h5py.File(self.detections_path, 'r')
+        # self.detections_dict = dict()
+        # for key in self.detections_file.keys():
+        #     self.detections_dict[key] = self.detections_file[key][()]
+
+        img_precomp_file = h5py.File(self.image_features_path, 'r')
+        self.precomp_index = list(img_precomp_file['index'][:])
+        if six.PY3:
+            self.precomp_index = [s.decode('utf-8') for s in self.precomp_index]
+
+        img_precomp_data = img_precomp_file['data']
+        self.image_features_precomp = dict()
+        for key in self.precomp_index:
+            self.image_features_precomp[key] = img_precomp_data[self.precomp_index.index(key)]
+
+        super(ImageAssociatedDetectionsField, self).__init__(None, postprocessing)
+
+    @staticmethod
+    def _bb_intersection_over_union(boxA, boxB):
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+
+        interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+
+        boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+        boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+        iou = interArea / (boxAArea + boxBArea - interArea)
+        return iou
+
+    def preprocess(self, x, avoid_precomp=False):
+        image = x[0]
+        gt_bboxes_set = x[1]
+
+        id_image = image.split('/')[-1].split('.')[0]
+        f = h5py.File(self.detections_path, 'r')
+        det_bboxes = f['%s_boxes' % id_image]
+        det_features = f['%s_features' % id_image]
+
+        # det_bboxes = self.detections_dict['%s_boxes' % id_image]
+        # det_features = self.detections_dict['%s_features' % id_image]
+        feature_dim = det_features.shape[-1]
+        features = np.zeros((self.max_detections, feature_dim))
+
+        for i, bboxes in enumerate(gt_bboxes_set[:self.max_detections]):
+            overall_bbox = [min(b[0] for b in bboxes),
+                      min(b[1] for b in bboxes),
+                      max(b[2] for b in bboxes),
+                      max(b[3] for b in bboxes)]
+
+            id_bbox = -1
+            iou_max = 0
+            for k, det_bbox in enumerate(det_bboxes):
+                iou = self._bb_intersection_over_union(overall_bbox, det_bbox)
+                if iou_max < iou:
+                    id_bbox = k
+                    iou_max = iou
+
+            features[i] = np.asarray(det_features[id_bbox])
+
+        return features.astype(np.float32), self.image_features_precomp[image]
+
+
+class PadField(RawField):
+    def __init__(self, padding_idx, fix_length=None, pad_init=True, pad_eos=True, dtype=torch.long):
+        self.padding_idx = padding_idx
+        self.fix_length = fix_length
+        self.init_token = padding_idx if pad_init else None
+        self.eos_token = padding_idx if pad_eos else None
+        self.dtype = dtype
+        super(PadField, self).__init__()
+
+    def process(self, minibatch, device=None):
+        minibatch = list(minibatch)
+        if self.fix_length is None:
+            max_len = max(len(x) for x in minibatch)
+        else:
+            max_len = self.fix_length + (
+                self.init_token, self.eos_token).count(None) - 2
+        padded, lengths = [], []
+        for x in minibatch:
+            padded.append(
+                ([] if self.init_token is None else [self.init_token]) +
+                list(x[:max_len]) +
+                ([] if self.eos_token is None else [self.eos_token]) +
+                [self.padding_idx] * max(0, max_len - len(x)))
+
+        var = torch.tensor(padded, dtype=self.dtype, device=device)
+        return var
 
 
 class TextField(RawField):
