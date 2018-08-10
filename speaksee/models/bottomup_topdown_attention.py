@@ -78,7 +78,7 @@ class BottomupTopdownAttention(CaptioningModel):
             input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            att_weights = F.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
+            att_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
             att_weights = self.att_a(att_weights)
             att_weights = (1-detections_mask)*-9e9 + detections_mask*att_weights
             att_weights = F.softmax(att_weights, 1)
@@ -110,7 +110,7 @@ class BottomupTopdownAttention(CaptioningModel):
             input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
             state_1 = self.lstm_cell_1(input_1, state_1)
 
-            att_weights = F.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
+            att_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
             att_weights = self.att_a(att_weights)
             att_weights = (1-detections_mask)*-9e9 + detections_mask*att_weights
             att_weights = F.softmax(att_weights, 1)

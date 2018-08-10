@@ -40,6 +40,7 @@ cnn.avgpool.forward = lambda x : x.mean(-1).mean(-1)
 cnn.fc = nn.Sequential()
 
 transforms = Compose([
+    ToTensor(),
     Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
