@@ -55,7 +55,9 @@ class Meteor:
         score_line = ' ||| '.join(('SCORE', ' ||| '.join(reference_list), hypothesis_str))
         self.meteor_p.stdin.write('{}\n'.format(score_line).encode())
         self.meteor_p.stdin.flush()
-        return self.meteor_p.stdout.readline().decode().strip()
+        raw = self.meteor_p.stdout.readline().decode().strip()
+        numbers = [str(int(float(n))) for n in raw.split()]
+        return ' '.join(numbers)
 
     def _score(self, hypothesis_str, reference_list):
         self.lock.acquire()
