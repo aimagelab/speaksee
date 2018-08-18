@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch import distributions
 
 class CaptioningModel(nn.Module):
     def __init__(self):
@@ -37,11 +38,28 @@ class CaptioningModel(nn.Module):
 
         outputs = []
         for t in range(seq_len):
-            out, state = self.step(t, state, out, images, mode='test')
+            out, state = self.step(t, state, out, images, mode='feedback')
+            out = torch.max(out, -1)[1]
             outputs.append(out)
 
-        outputs = torch.cat([o.unsqueeze(1) for o in outputs], 1)
-        return torch.max(outputs, -1)[1]
+        return torch.cat([o.unsqueeze(1) for o in outputs], 1)
+
+    def sample_rl(self, images, seq_len):
+        device = images.device
+        b_s = images.size(0)
+        state = self.init_state(b_s, device)
+        out = None
+
+        outputs = []
+        log_probs = []
+        for t in range(seq_len):
+            out, state = self.step(t, state, out, images, mode='feedback')
+            distr = distributions.Categorical(logits=out)
+            out = distr.sample()
+            outputs.append(out)
+            log_probs.append(distr.log_prob(out))
+
+        return torch.cat([o.unsqueeze(1) for o in outputs], 1), torch.cat([o.unsqueeze(1) for o in log_probs], 1)
 
     def beam_search(self, images, seq_len, eos_idx, beam_size, out_size=1):
         device = images.device
@@ -60,7 +78,7 @@ class CaptioningModel(nn.Module):
             tmp_outputs_i = [[] for _ in range(cur_beam_size)]
             seq_logprob = .0
             for t in range(seq_len):
-                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, mode='beam_search')
+                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, mode='feedback')
                 seq_logprob = seq_logprob + word_logprob
                 selected_logprob, selected_idx = torch.sort(seq_logprob.view(-1), -1, descending=True)
                 selected_logprob, selected_idx = selected_logprob[:cur_beam_size], selected_idx[:cur_beam_size]

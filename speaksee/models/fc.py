@@ -71,7 +71,7 @@ class FC(CaptioningModel):
         return h0, c0
 
     def step(self, t, state, prev_output, images, seq=None, mode='teacher_forcing'):
-        assert (mode in ['teacher_forcing', 'test', 'beam_search'])
+        assert (mode in ['teacher_forcing', 'feedback'])
         device = images.device
         b_s = images.size(0)
         if t == 0:
@@ -88,9 +88,7 @@ class FC(CaptioningModel):
                     it = it.to(device)
                 else:
                     it = seq[:, t - 1]
-            elif mode == 'test':
-                it = torch.max(prev_output, -1)[1]
-            elif mode == 'beam_search':
+            elif mode == 'feedback':
                 it = prev_output
 
             xt = self.embed(it)
@@ -98,26 +96,3 @@ class FC(CaptioningModel):
         out, state = self.lstm_cell(xt, state)
         out = F.log_softmax(self.out_fc(out), dim=-1)
         return out, state
-
-    def sample_rl(self, images, seq_len):
-        device = images.device
-        b_s = images.size(0)
-        state = self.init_state(b_s, device)
-        outputs = []
-        log_probs = []
-
-        for t in range(seq_len):
-            if t == 0:
-                xt = self.fc_image(images)
-            else:
-                xt = self.embed(it)
-
-            out, state = self.lstm_cell(xt, state)
-            out = F.log_softmax(self.out_fc(out), dim=-1)
-            distr = distributions.Categorical(logits=out)
-            it = distr.sample()
-            outputs.append(it)
-            log_probs.append(distr.log_prob(it))
-
-        # togliere i <pad> dal grandiente?
-        return torch.cat([o.unsqueeze(1) for o in outputs], 1), torch.cat([o.unsqueeze(1) for o in log_probs], 1)
