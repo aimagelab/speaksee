@@ -104,6 +104,7 @@ class FC(CaptioningModel):
         b_s = images.size(0)
         state = self.init_state(b_s, device)
         outputs = []
+        log_probs = []
 
         for t in range(seq_len):
             if t == 0:
@@ -115,7 +116,8 @@ class FC(CaptioningModel):
             out = F.log_softmax(self.out_fc(out), dim=-1)
             distr = distributions.Categorical(logits=out)
             it = distr.sample()
-            outputs.append(distr.log_prob(it))
+            outputs.append(it)
+            log_probs.append(distr.log_prob(it))
 
         # togliere i <pad> dal grandiente?
-        return torch.cat(outputs, 1)
+        return torch.cat([o.unsqueeze(1) for o in outputs], 1), torch.cat([o.unsqueeze(1) for o in log_probs], 1)
