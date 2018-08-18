@@ -325,11 +325,24 @@ class TextField(RawField):
             return var, lengths
         return var
 
-    def decode(self, cap):
-        words = []
-        for w in cap:
-            word = self.vocab.itos[int(w)]
-            if word == '<eos>':
-                break
-            words.append(word)
-        return words
+    def decode(self, word_idxs, join_words=True):
+        if isinstance(word_idxs, list) and isinstance(word_idxs[0], int):
+            word_idxs = [word_idxs, ]
+        elif isinstance(word_idxs, np.ndarray) and word_idxs.ndim == 1:
+            word_idxs = word_idxs.reshape((1, -1))
+        elif isinstance(word_idxs, torch.Tensor) and word_idxs.ndimension() == 1:
+            word_idxs = word_idxs.view((1, -1))
+        captions = []
+        for wis in word_idxs:
+            caption = []
+            for wi in wis:
+                word = self.vocab.itos[int(wi)]
+                if word == self.eos_token:
+                    break
+                caption.append(word)
+            if join_words:
+                caption = ' '.join(caption)
+            captions.append(caption)
+        if len(captions) == 1:
+            captions = captions[0]
+        return captions
