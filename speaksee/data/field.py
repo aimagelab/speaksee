@@ -135,7 +135,7 @@ class ImageDetectionsField(RawField):
 
         super(ImageDetectionsField, self).__init__(None, postprocessing)
 
-    def preprocess(self, x, avoid_precomp=False):
+    def preprocess(self, x):
         image_id = int(x.split('_')[-1].split('.')[0])
         det_file = h5py.File(self.detections_path, 'r')
         try:
@@ -189,7 +189,7 @@ class ImageAssociatedDetectionsField(RawField):
         iou = interArea / (boxAArea + boxBArea - interArea)
         return iou
 
-    def preprocess(self, x, avoid_precomp=False):
+    def preprocess(self, x):
         image = x[0]
         gt_bboxes_set = x[1]
 
