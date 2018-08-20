@@ -128,7 +128,7 @@ class ImageDetectionsField(RawField):
     def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
-        self.detections_file = h5py.File(self.detections_path, 'r')
+        detections_file = h5py.File(self.detections_path, 'r')
         self.detections = dict()
         for key in self.detections_file.keys():
             self.detections[key] = self.detections_file[key][()]
@@ -326,7 +326,7 @@ class TextField(RawField):
         return var
 
     def decode(self, word_idxs, join_words=True):
-        if isinstance(word_idxs, list) and isinstance(word_idxs[0], int):
+        if isinstance(word_idxs, list):
             word_idxs = [word_idxs, ]
         elif isinstance(word_idxs, np.ndarray) and word_idxs.ndim == 1:
             word_idxs = word_idxs.reshape((1, -1))
