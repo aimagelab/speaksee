@@ -50,75 +50,46 @@ class BottomupTopdownAttention(CaptioningModel):
         c0_1 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
         h0_2 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
         c0_2 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
-        return (h0_1, c0_1), (h0_2, c0_2)
+        return h0_1, c0_1, h0_2, c0_2
 
-    def forward(self, detections, seq):
+    def step(self, t, state, prev_output, detections, seq=None, mode='teacher_forcing', **kwargs):
+        assert (mode in ['teacher_forcing', 'feedback'])
+        assert ('bos_idx' in kwargs)
         device = detections.device
         b_s = detections.size(0)
-        seq_len = seq.size(1)
+        bos_idx = kwargs['bos_idx']
+        state_1, state_2 = state[:2], state[2:]
         detections_mask = (torch.sum(detections, -1, keepdim=True) != 0).float()
         detections_mean = torch.sum(detections, 1) / torch.sum(detections_mask, 1)
 
-        state_1, state_2 = self.init_state(b_s, device)
-        outputs = []
-
-        for t in range(seq_len):
+        if mode == 'teacher_forcing':
             if self.training and t > 0 and self.ss_prob > .0:
                 # Scheduled sampling
                 coin = detections.data.new(b_s).uniform_(0, 1)
                 coin = (coin < self.ss_prob).long()
-                distr = distributions.Categorical(logits = outputs[-1].squeeze(1))
+                distr = distributions.Categorical(logits=prev_output)
                 action = distr.sample()
-                it = coin * action.data + (1-coin) * seq[:, t-1].data
+                it = coin * action.data + (1 - coin) * seq[:, t - 1].data
                 it = it.to(device)
             else:
-                it = seq[:, t]
-            xt = self.embed(it)
-
-            input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
-            state_1 = self.lstm_cell_1(input_1, state_1)
-
-            att_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
-            att_weights = self.att_a(att_weights)
-            att_weights = (1-detections_mask)*-9e9 + detections_mask*att_weights
-            att_weights = F.softmax(att_weights, 1)
-            att_detections = torch.sum(detections * att_weights, 1)
-            input_2 = torch.cat([state_1[0], att_detections], 1)
-
-            state_2 = self.lstm_cell_2(input_2, state_2)
-            out = F.log_softmax(self.out_fc(state_2[0]), dim=-1)
-            outputs.append(out.unsqueeze(1))
-
-        return torch.cat(outputs, 1)
-
-    def test(self, detections, seq_len, bos_idx):
-        device = detections.device
-        b_s = detections.size(0)
-        detections_mask = (torch.sum(detections, -1, keepdim=True) != 0).float()
-        detections_mean = torch.sum(detections, 1) / torch.sum(detections_mask, 1)
-
-        state_1, state_2 = self.init_state(b_s, device)
-        outputs = []
-
-        for t in range(seq_len):
+                it = seq[:, t - 1]
+        elif mode == 'feedback':
             if t == 0:
                 it = detections.data.new_full((b_s,), bos_idx).long()
             else:
-                it = torch.max(outputs[-1].squeeze(1), -1)[1]
-            xt = self.embed(it)
+                it = prev_output
 
-            input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
-            state_1 = self.lstm_cell_1(input_1, state_1)
+        xt = self.embed(it)
+        input_1 = torch.cat([state_2[0], detections_mean, xt], 1)
+        state_1 = self.lstm_cell_1(input_1, state_1)
 
-            att_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
-            att_weights = self.att_a(att_weights)
-            att_weights = (1-detections_mask)*-9e9 + detections_mask*att_weights
-            att_weights = F.softmax(att_weights, 1)
-            att_detections = torch.sum(detections * att_weights, 1)
-            input_2 = torch.cat([state_1[0], att_detections], 1)
+        att_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
+        att_weights = self.att_a(att_weights)
+        att_weights = (1 - detections_mask) * -9e9 + detections_mask * att_weights
+        att_weights = F.softmax(att_weights, 1)
+        att_detections = torch.sum(detections * att_weights, 1)
+        input_2 = torch.cat([state_1[0], att_detections], 1)
 
-            state_2 = self.lstm_cell_2(input_2, state_2)
-            out = F.log_softmax(self.out_fc(state_2[0]), dim=-1)
-            outputs.append(out.unsqueeze(1))
-
-        return torch.max(torch.cat(outputs, 1), -1)[1]
+        state_2 = self.lstm_cell_2(input_2, state_2)
+        out = F.log_softmax(self.out_fc(state_2[0]), dim=-1)
+        return out, (state_1[0], state_1[1], state_2[0], state_2[1])

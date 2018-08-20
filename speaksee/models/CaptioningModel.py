@@ -12,10 +12,10 @@ class CaptioningModel(nn.Module):
     def init_state(self, b_s, device):
         raise NotImplementedError
 
-    def step(self, t, state, prev_output, images, seq=None, mode='teacher_forcing'):
+    def step(self, t, state, prev_output, images, seq=None, mode='teacher_forcing', **kwargs):
         raise NotImplementedError
 
-    def forward(self, images, seq):
+    def forward(self, images, seq, **kwargs):
         device = images.device
         b_s = images.size(0)
         seq_len = seq.size(1)
@@ -24,13 +24,13 @@ class CaptioningModel(nn.Module):
 
         outputs = []
         for t in range(seq_len):
-            out, state = self.step(t, state, out, images, seq, mode='teacher_forcing')
+            out, state = self.step(t, state, out, images, seq, mode='teacher_forcing', **kwargs)
             outputs.append(out)
 
         outputs = torch.cat([o.unsqueeze(1) for o in outputs], 1)
         return outputs
 
-    def test(self, images, seq_len):
+    def test(self, images, seq_len, **kwargs):
         device = images.device
         b_s = images.size(0)
         state = self.init_state(b_s, device)
@@ -38,13 +38,13 @@ class CaptioningModel(nn.Module):
 
         outputs = []
         for t in range(seq_len):
-            out, state = self.step(t, state, out, images, mode='feedback')
+            out, state = self.step(t, state, out, images, mode='feedback', **kwargs)
             out = torch.max(out, -1)[1]
             outputs.append(out)
 
         return torch.cat([o.unsqueeze(1) for o in outputs], 1)
 
-    def sample_rl(self, images, seq_len):
+    def sample_rl(self, images, seq_len, **kwargs):
         device = images.device
         b_s = images.size(0)
         state = self.init_state(b_s, device)
@@ -53,7 +53,7 @@ class CaptioningModel(nn.Module):
         outputs = []
         log_probs = []
         for t in range(seq_len):
-            out, state = self.step(t, state, out, images, mode='feedback')
+            out, state = self.step(t, state, out, images, mode='feedback', **kwargs)
             distr = distributions.Categorical(logits=out)
             out = distr.sample()
             outputs.append(out)
@@ -61,7 +61,7 @@ class CaptioningModel(nn.Module):
 
         return torch.cat([o.unsqueeze(1) for o in outputs], 1), torch.cat([o.unsqueeze(1) for o in log_probs], 1)
 
-    def beam_search(self, images, seq_len, eos_idx, beam_size, out_size=1):
+    def beam_search(self, images, seq_len, eos_idx, beam_size, out_size=1, **kwargs):
         device = images.device
         b_s = images.size(0)
         state = self.init_state(b_s, device)
@@ -78,7 +78,7 @@ class CaptioningModel(nn.Module):
             tmp_outputs_i = [[] for _ in range(cur_beam_size)]
             seq_logprob = .0
             for t in range(seq_len):
-                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, mode='feedback')
+                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, mode='feedback', **kwargs)
                 seq_logprob = seq_logprob + word_logprob
                 selected_logprob, selected_idx = torch.sort(seq_logprob.view(-1), -1, descending=True)
                 selected_logprob, selected_idx = selected_logprob[:cur_beam_size], selected_idx[:cur_beam_size]
