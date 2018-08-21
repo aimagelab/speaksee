@@ -2,6 +2,8 @@
 from __future__ import unicode_literals
 import unittest
 import speaksee.data as data
+import numpy as np
+import torch
 
 
 '''class TestImageField(object):
@@ -71,4 +73,42 @@ class TestTextField(object):
         assert field.pad(minibatch) == expected_padded_minibatch
         field = data.TextField(init_token="<bos>", eos_token="<eos>", include_lengths=True)
         assert field.pad(minibatch) == (expected_padded_minibatch, expected_lengths)
-        
+
+    def test_decode(self):
+        def test_all_dtypes(word_idxs, expected_output):
+            assert field.decode(word_idxs) == expected_output
+            assert field.decode(np.asarray(word_idxs)) == expected_output
+            assert field.decode(torch.from_numpy(np.asarray(word_idxs))) == expected_output
+
+        class MyVocab(object):
+            def __init__(self, eos_token):
+                self.itos = {0: 'a',
+                        1: 'b',
+                        2: eos_token,
+                        3: 'c'}
+
+        field = data.TextField()
+        field.vocab = MyVocab(field.eos_token)
+
+        # Empty captions (not tested for PyTorch tensors)
+        word_idxs = []
+        expected_output = ''
+        assert field.decode(word_idxs) == expected_output
+        assert field.decode(np.asarray(word_idxs)) == expected_output
+
+        word_idxs = [[]]
+        expected_output = ['', ]
+        assert field.decode(word_idxs) == expected_output
+        assert field.decode(np.asarray(word_idxs)) == expected_output
+
+        # Single caption
+        word_idxs = [0, 3, 2, 1]
+        expected_output = 'a c'
+        test_all_dtypes(word_idxs, expected_output)
+
+        # Batch of captions
+        word_idxs = [[0, 3, 2, 1],
+                     [3, 3, 2, 1],
+                     [2, 1, 1, 1]]
+        expected_output = ['a c', 'c c', '']
+        test_all_dtypes(word_idxs, expected_output)

@@ -326,12 +326,15 @@ class TextField(RawField):
         return var
 
     def decode(self, word_idxs, join_words=True):
-        if isinstance(word_idxs, list):
-            word_idxs = [word_idxs, ]
+        if isinstance(word_idxs, list) and len(word_idxs) == 0:
+            return self.decode([word_idxs, ], join_words)[0]
+        if isinstance(word_idxs, list) and isinstance(word_idxs[0], int):
+            return self.decode([word_idxs, ], join_words)[0]
         elif isinstance(word_idxs, np.ndarray) and word_idxs.ndim == 1:
-            word_idxs = word_idxs.reshape((1, -1))
+            return self.decode(word_idxs.reshape((1, -1)), join_words)[0]
         elif isinstance(word_idxs, torch.Tensor) and word_idxs.ndimension() == 1:
-            word_idxs = word_idxs.view((1, -1))
+            return self.decode(word_idxs.unsqueeze(0), join_words)[0]
+
         captions = []
         for wis in word_idxs:
             caption = []
@@ -343,6 +346,4 @@ class TextField(RawField):
             if join_words:
                 caption = ' '.join(caption)
             captions.append(caption)
-        if len(captions) == 1:
-            captions = captions[0]
         return captions
