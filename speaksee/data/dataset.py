@@ -121,22 +121,29 @@ class PairedDataset(Dataset):
         super(PairedDataset, self).__init__(examples, fields)
         self.image_field = self.fields['image']
         self.text_field = self.fields['text']
-        self.image_children = collections.defaultdict(set)
-        self.text_children = collections.defaultdict(set)
-        for e in self.examples:
-            self.image_children[e.image].add(e.text)
-            self.text_children[e.text].add(e.image)
 
-    def image_dataset(self):
-        image_set = list(self.image_children.keys())
+    def image_set(self):
+        image_set = set(e.image for e in self.examples)
         examples = [Example.fromdict({'image': i}) for i in image_set]
         dataset = Dataset(examples, {'image': self.image_field})
         return dataset
 
-    def text_dataset(self):
-        text_set = list(self.text_children.keys())
+    def text_set(self):
+        text_set = set(e.text for e in self.examples)
         examples = [Example.fromdict({'text': t}) for t in text_set]
         dataset = Dataset(examples, {'text': self.image_field})
+        return dataset
+
+    def image_dictionary(self, fields=None):
+        if not fields:
+            fields = self.fields
+        dataset = DictionaryDataset(self.examples, fields, key_fields='image')
+        return dataset
+
+    def text_dictionary(self, fields=None):
+        if not fields:
+            fields = self.fields
+        dataset = DictionaryDataset(self.examples, fields, key_fields='text')
         return dataset
 
     @property
