@@ -124,6 +124,6 @@ for e in range(50):
 ```
 
 ### Model zoo
-| Model     | CIDEr | Download   |
-|-----------|-------|------------|
-| FC        | 93.78 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/fc_epoch_029.pth)        |
+| Model        | CIDEr | Download   |
+|--------------|-------|------------|
+| FC-2k (beam) | 93.78 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/fc_epoch_029.pth)        |
