@@ -1,20 +1,28 @@
-#!/usr/bin/env python
-
 # Python wrapper for METEOR implementation, by Xinlei Chen
 # Acknowledge Michael Denkowski for the generous discussion and help
 
 import os
-import sys
 import subprocess
 import threading
+import tarfile
+from speaksee.utils import download_from_url
 
-# Assumes meteor-1.5.jar is in the same directory as meteor.py.  Change as needed.
+METEOR_GZ_URL = 'http://aimagelab.ing.unimore.it/speaksee/data/meteor.tgz'
 METEOR_JAR = 'meteor-1.5.jar'
-# print METEOR_JAR
 
 class Meteor:
-
     def __init__(self):
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        jar_path = os.path.join(base_path, METEOR_JAR)
+        gz_path = os.path.join(base_path, os.path.basename(METEOR_GZ_URL))
+        if not os.path.isfile(jar_path):
+            if not os.path.isfile(jar_path):
+                download_from_url(METEOR_GZ_URL, gz_path)
+            tar = tarfile.open(gz_path, "r")
+            tar.extractall(path=os.path.dirname(os.path.abspath(__file__)))
+            tar.close()
+            os.remove(gz_path)
+
         self.meteor_cmd = ['java', '-jar', '-Xmx2G', METEOR_JAR, \
                 '-', '-', '-stdio', '-l', 'en', '-norm']
         self.meteor_p = subprocess.Popen(self.meteor_cmd, \
