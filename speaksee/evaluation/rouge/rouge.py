@@ -104,5 +104,5 @@ class Rouge():
         average_score = np.mean(np.array(score))
         return average_score, np.array(score)
 
-    def method(self):
-        return "Rouge"
+    def __str__(self):
+        return 'ROUGE'

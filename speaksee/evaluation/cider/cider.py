@@ -48,3 +48,6 @@ class Cider:
         (score, scores) = cider_scorer.compute_score()
 
         return score, scores
+
+    def __str__(self):
+        return 'CIDEr'

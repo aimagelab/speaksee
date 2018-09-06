@@ -42,5 +42,5 @@ class Bleu:
 
         return score, scores
 
-    def method(self):
-        return "Bleu"
+    def __str__(self):
+        return 'BLEU'

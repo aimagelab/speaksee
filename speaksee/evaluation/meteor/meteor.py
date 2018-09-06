@@ -70,3 +70,6 @@ class Meteor:
         self.meteor_p.kill()
         self.meteor_p.wait()
         self.lock.release()
+
+    def __str__(self):
+        return 'METEOR'

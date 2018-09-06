@@ -110,5 +110,5 @@ class Spice:
             scores.append(score_set)
         return average_score, scores
 
-    def method(self):
-        return "SPICE"
+    def __str__(self):
+        return 'SPICE'
