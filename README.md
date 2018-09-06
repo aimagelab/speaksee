@@ -5,7 +5,7 @@ Speaksee is a Python package that provides utilities for working with Visual-Sem
 ## Installation
 Speaksee is under development. 
 
-To have a working installation, make sure you have Python 2.7 or 3.5+. You can then install speaksee from source with:
+To have a working installation, make sure you have Python 3.5+. You can then install speaksee from source with:
 
 ```
 git clone https://github.com/aimagelab/speaksee
@@ -123,7 +123,37 @@ for e in range(50):
     }, '/nas/houston/lorenzo/fc_epoch_%03d.pth' % e)
 ```
 
+### Evaluating a model
+```
+from speaksee.evaluation import Cider
+from speaksee.evaluation import PTBTokenizer
+dict_dataset_val = val_dataset.image_dictionary({'image': image_field, 'text': RawField()})
+dict_dataloader_val = DataLoader(dict_dataset_val, batch_size=16)
+gen = {}
+gts = {}
+with tqdm(desc='Validation', unit='it', total=len(dict_dataloader_val)) as pbar:
+    for it, (images, caps_gt) in enumerate(iter(dict_dataloader_val)):
+        images = images.to(device)
+        with torch.no_grad():
+            out = model.beam_search(images, 50, text_field.vocab.stoi['<eos>'], 2, out_size=1)
+        caps_gen = text_field.decode(out)
+        for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+            gen['%d_%d' % (it, i)] = [gen_i, ]
+            gts['%d_%d' % (it, i)] = gts_i
+        pbar.update()
+
+gts = PTBTokenizer.tokenize(gts)
+gen = PTBTokenizer.tokenize(gen)
+val_cider, _ = Cider().compute_score(gts, gen)
+print("CIDEr is %f" % val_cider)
+```
+
 ### Model zoo
 | Model        | CIDEr | Download   |
 |--------------|-------|------------|
 | FC-2k (beam) | 93.78 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/fc_epoch_029.pth)        |
+
+
+### The team
+Speaksee is currently maintained by [Lorenzo Baraldi](http://www.lorenzobaraldi.com) and
+ [Marcella Cornia](http://imagelab.ing.unimore.it/imagelab/person.asp?idpersona=90)
