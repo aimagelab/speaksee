@@ -72,7 +72,7 @@ class BottomupTopdownAttention(CaptioningModel):
                 it = coin * action.data + (1 - coin) * seq[:, t - 1].data
                 it = it.to(device)
             else:
-                it = seq[:, t - 1]
+                it = seq[:, t]
         elif mode == 'feedback':
             if t == 0:
                 it = detections.data.new_full((b_s,), bos_idx).long()
@@ -85,8 +85,9 @@ class BottomupTopdownAttention(CaptioningModel):
 
         att_weights = torch.tanh(self.att_va(detections) + self.att_ha(state_1[0]).unsqueeze(1))
         att_weights = self.att_a(att_weights)
-        att_weights = (1 - detections_mask) * -9e9 + detections_mask * att_weights
         att_weights = F.softmax(att_weights, 1)
+        att_weights = detections_mask * att_weights
+        att_weights = att_weights / torch.sum(att_weights, 1, keepdim=True)
         att_detections = torch.sum(detections * att_weights, 1)
         input_2 = torch.cat([state_1[0], att_detections], 1)
 
