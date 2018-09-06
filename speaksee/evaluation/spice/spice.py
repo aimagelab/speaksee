@@ -1,14 +1,14 @@
 from __future__ import division
 import os
-import sys
 import subprocess
-import threading
 import json
 import numpy as np
-import ast
 import tempfile
+import tarfile
+from speaksee.utils import download_from_url
 
 # Assumes spice.jar is in the same directory as spice.py.  Change as needed.
+SPICE_GZ_URL = 'http://aimagelab.ing.unimore.it/speaksee/data/spice.tgz'
 SPICE_JAR = 'spice-1.0.jar'
 TEMP_DIR = 'tmp'
 CACHE_DIR = 'cache'
@@ -18,6 +18,19 @@ class Spice:
     """
     Main Class to compute the SPICE metric
     """
+
+    def __init__(self):
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        jar_path = os.path.join(base_path, SPICE_JAR)
+        gz_path = os.path.join(base_path, os.path.basename(SPICE_GZ_URL))
+        if not os.path.isfile(jar_path):
+            if not os.path.isfile(gz_path):
+                download_from_url(SPICE_GZ_URL, gz_path)
+            tar = tarfile.open(gz_path, "r")
+            tar.extractall(path=os.path.dirname(os.path.abspath(__file__)))
+            tar.close()
+            os.remove(gz_path)
+
 
     def float_convert(self, obj):
         try:
