@@ -1,4 +1,4 @@
-# Speaksee
+![Speaksee Logo](_static/logo.png)
 
 Speaksee is a Python package that provides utilities for working with Visual-Semantic data, developed at AImageLab.
 
