@@ -70,7 +70,7 @@ class FC(CaptioningModel):
         c0 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
         return h0, c0
 
-    def step(self, t, state, prev_output, images, seq=None, mode='teacher_forcing', **kwargs):
+    def step(self, t, state, prev_output, images, seq, *args, mode='teacher_forcing'):
         assert (mode in ['teacher_forcing', 'feedback'])
         device = images.device
         b_s = images.size(0)

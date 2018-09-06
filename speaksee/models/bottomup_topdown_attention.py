@@ -8,10 +8,11 @@ from .CaptioningModel import CaptioningModel
 
 
 class BottomupTopdownAttention(CaptioningModel):
-    def __init__(self, vocab_size, det_feat_size=2048, input_encoding_size=1000, rnn_size=1000, att_size=512,
+    def __init__(self, vocab_size, bos_idx, det_feat_size=2048, input_encoding_size=1000, rnn_size=1000, att_size=512,
                  ss_prob=.0):
         super(BottomupTopdownAttention, self).__init__()
         self.vocab_size = vocab_size
+        self.bos_idx = bos_idx
         self.det_feat_size = det_feat_size
         self.input_encoding_size = input_encoding_size
         self.rnn_size = rnn_size
@@ -52,12 +53,11 @@ class BottomupTopdownAttention(CaptioningModel):
         c0_2 = torch.zeros((b_s, self.rnn_size), requires_grad=True).to(device)
         return h0_1, c0_1, h0_2, c0_2
 
-    def step(self, t, state, prev_output, detections, seq=None, mode='teacher_forcing', **kwargs):
+    def step(self, t, state, prev_output, detections, seq, *args, mode='teacher_forcing'):
         assert (mode in ['teacher_forcing', 'feedback'])
-        assert ('bos_idx' in kwargs)
         device = detections.device
         b_s = detections.size(0)
-        bos_idx = kwargs['bos_idx']
+        bos_idx = self.bos_idx
         state_1, state_2 = state[:2], state[2:]
         detections_mask = (torch.sum(detections, -1, keepdim=True) != 0).float()
         detections_mean = torch.sum(detections, 1) / torch.sum(detections_mask, 1)

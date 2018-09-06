@@ -12,10 +12,10 @@ class CaptioningModel(nn.Module):
     def init_state(self, b_s, device):
         raise NotImplementedError
 
-    def step(self, t, state, prev_output, images, seq=None, mode='teacher_forcing', **kwargs):
+    def step(self, t, state, prev_output, images, seq, *args, mode='teacher_forcing'):
         raise NotImplementedError
 
-    def forward(self, images, seq, **kwargs):
+    def forward(self, images, seq, *args):
         device = images.device
         b_s = images.size(0)
         seq_len = seq.size(1)
@@ -24,7 +24,7 @@ class CaptioningModel(nn.Module):
 
         outputs = []
         for t in range(seq_len):
-            out, state = self.step(t, state, out, images, seq, mode='teacher_forcing', **kwargs)
+            out, state = self.step(t, state, out, images, seq, *args, mode='teacher_forcing')
             outputs.append(out)
 
         outputs = torch.cat([o.unsqueeze(1) for o in outputs], 1)
@@ -78,7 +78,7 @@ class CaptioningModel(nn.Module):
             tmp_outputs_i = [[] for _ in range(cur_beam_size)]
             seq_logprob = .0
             for t in range(seq_len):
-                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, mode='feedback', **kwargs)
+                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, None, mode='feedback')
                 seq_logprob = seq_logprob + word_logprob
                 selected_logprob, selected_idx = torch.sort(seq_logprob.view(-1), -1, descending=True)
                 selected_logprob, selected_idx = selected_logprob[:cur_beam_size], selected_idx[:cur_beam_size]
