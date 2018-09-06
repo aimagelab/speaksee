@@ -124,7 +124,7 @@ for e in range(50):
 ```
 
 ### Evaluating a model
-```
+``` python
 from speaksee.evaluation import Cider
 from speaksee.evaluation import PTBTokenizer
 dict_dataset_val = val_dataset.image_dictionary({'image': image_field, 'text': RawField()})
