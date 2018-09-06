@@ -103,6 +103,7 @@ class CaptioningModel(nn.Module):
                     break
 
                 state_i = tuple(torch.index_select(s, 0, selected_beam) for s in state_i)
+                images_i = torch.index_select(images_i, 0, selected_beam)
                 seq_logprob = selected_logprob.view(-1, 1)
 
             # Update outputs with sequences that did not reach EOS
