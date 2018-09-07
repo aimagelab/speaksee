@@ -25,6 +25,12 @@ class PTBTokenizer(object):
                 'edu.stanford.nlp.process.PTBTokenizer', \
                 '-preserveLines', '-lowerCase']
 
+        if isinstance(corpus, list) or isinstance(corpus, tuple):
+            if isinstance(corpus[0], list) or isinstance(corpus[0], tuple):
+                corpus = {i:c for i, c in enumerate(corpus)}
+            else:
+                corpus = {i: [c, ] for i, c in enumerate(corpus)}
+
         # prepare data for PTB Tokenizer
         tokenized_corpus = {}
         image_id = [k for k, v in list(corpus.items()) for _ in range(len(v))]

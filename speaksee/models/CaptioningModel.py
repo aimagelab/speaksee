@@ -117,3 +117,56 @@ class CaptioningModel(nn.Module):
             outputs.append(outputs_i)
 
         return outputs
+
+    def beam_search_new(self, images, seq_len, eos_idx, beam_size, out_size=1, *args):
+        # todo it does not work properly
+        # todo non andare avanti se raggiungono eos con altri beam... si riesce a farlo tutto tensoriale?
+        device = images.device
+        b_s = images.size(0)
+        state = self.init_state(b_s, device)
+
+        seq_logprob = .0
+
+        outputs = [[] for _ in range(b_s)]
+        logprobs = [[] for _ in range(b_s)]
+        tmp_outputs = [[[] for __ in range(beam_size)] for _ in range(b_s)]
+        selected_words = None
+
+        for t in range(seq_len):
+            cur_beam_size = 1 if t == 0 else beam_size
+
+            word_logprob, state = self.step(t, state, selected_words, images, None, *args, mode='feedback')
+            seq_logprob = seq_logprob + word_logprob.view(b_s, cur_beam_size, -1)
+
+            # Remove sequence if it reaches EOS
+            if t > 0:
+                mask = selected_words.view(b_s, cur_beam_size, -1) == eos_idx
+                seq_logprob = (1-mask).float()*seq_logprob
+            selected_logprob, selected_idx = torch.sort(seq_logprob.view(b_s, -1), -1, descending=True)
+            selected_logprob, selected_idx = selected_logprob[:, :beam_size], selected_idx[:, :beam_size]
+
+            selected_beam = selected_idx / seq_logprob.shape[-1]
+            selected_words = selected_idx - selected_beam*seq_logprob.shape[-1]
+
+            # Update outputs with sequences that reached EOS
+            for i in range(b_s):
+                outputs[i].extend([tmp_outputs[i][x.item()] for x in torch.masked_select(selected_beam[i], selected_words[i] == eos_idx)])
+                logprobs[i].extend([x.item() for x in torch.masked_select(selected_logprob[i], selected_words[i] == eos_idx)])
+                tmp_outputs[i] = [tmp_outputs[i][x.item()] for x in selected_beam[i]]
+                tmp_outputs[i] = [o+[selected_words[i, x].item(),] for x, o in enumerate(tmp_outputs[i])]
+
+            state = tuple(torch.gather(s.view(b_s, cur_beam_size, -1), 1, selected_beam.unsqueeze(-1).expand(b_s, beam_size, s.shape[-1])).view(-1, s.shape[-1]) for s in state)
+            seq_logprob = selected_logprob.unsqueeze(-1)
+            selected_words = selected_words.view(-1)
+
+        # Update outputs with sequences that did not reach EOS
+        for i in range(b_s):
+            outputs[i].extend(tmp_outputs[i])
+            logprobs[i].extend([x.item() for x in selected_logprob[i]])
+
+            # Sort result
+            outputs[i] = [x for _,x in sorted(zip(logprobs[i],outputs[i]), reverse=True)][:out_size]
+            if len(outputs[i]) == 1:
+                outputs[i] = outputs[i][0]
+
+        return outputs
