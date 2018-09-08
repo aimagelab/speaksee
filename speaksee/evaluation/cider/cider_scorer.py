@@ -47,48 +47,28 @@ class CiderScorer(object):
     """CIDEr scorer.
     """
 
-    def copy(self):
-        ''' copy the refs.'''
-        new = CiderScorer(n=self.n)
-        new.ctest = copy.copy(self.ctest)
-        new.crefs = copy.copy(self.crefs)
-        return new
-
-    def __init__(self, test=None, refs=None, n=4, sigma=6.0):
+    def __init__(self, refs, test=None, n=4, sigma=6.0, doc_frequency=None):
         ''' singular instance '''
         self.n = n
         self.sigma = sigma
         self.crefs = []
         self.ctest = []
-        self.document_frequency = defaultdict(float)
-        self.cook_append(test, refs)
-        self.ref_len = None
+        self.doc_frequency = defaultdict(float)
 
-    def cook_append(self, test, refs):
-        '''called by constructor and __iadd__ to avoid creating new instances.'''
-
-        if refs is not None:
-            self.crefs.append(cook_refs(refs))
+        for k in refs.keys():
+            self.crefs.append(cook_refs(refs[k]))
             if test is not None:
-                self.ctest.append(cook_test(test)) ## N.B.: -1
+                self.ctest.append(cook_test(test[k][0]))  ## N.B.: -1
             else:
-                self.ctest.append(None) # lens of crefs and ctest have to match
+                self.ctest.append(None)  # lens of crefs and ctest have to match
 
-    def size(self):
-        assert len(self.crefs) == len(self.ctest), "refs/test mismatch! %d<>%d" % (len(self.crefs), len(self.ctest))
-        return len(self.crefs)
-
-    def __iadd__(self, other):
-        '''add an instance (e.g., from another sentence).'''
-
-        if type(other) is tuple:
-            ## avoid creating new CiderScorer instances
-            self.cook_append(other[0], other[1])
+        self.ref_len = None
+        if doc_frequency is None:
+            # compute idf
+            self.compute_doc_freq()
         else:
-            self.ctest.extend(other.ctest)
-            self.crefs.extend(other.crefs)
+            self.doc_frequency = doc_frequency
 
-        return self
     def compute_doc_freq(self):
         '''
         Compute term frequency for reference data.
@@ -99,7 +79,7 @@ class CiderScorer(object):
         for refs in self.crefs:
             # refs, k ref captions of one image
             for ngram in set([ngram for ref in refs for (ngram,count) in ref.items()]):
-                self.document_frequency[ngram] += 1
+                self.doc_frequency[ngram] += 1
             # maxcounts[ngram] = max(maxcounts.get(ngram,0), count)
 
     def compute_cider(self):
@@ -116,7 +96,7 @@ class CiderScorer(object):
             norm = [0.0 for _ in range(self.n)]
             for (ngram,term_freq) in cnts.items():
                 # give word count 1 if it doesn't appear in reference corpus
-                df = np.log(max(1.0, self.document_frequency[ngram]))
+                df = np.log(max(1.0, self.doc_frequency[ngram]))
                 # ngram index
                 n = len(ngram)-1
                 # tf (term_freq) * idf (precomputed idf) for n-grams
@@ -180,10 +160,8 @@ class CiderScorer(object):
         return scores
 
     def compute_score(self):
-        # compute idf
-        self.compute_doc_freq()
         # assert to check document frequency
-        assert(len(self.ctest) >= max(self.document_frequency.values()))
+        assert(len(self.ctest) >= max(self.doc_frequency.values()))
         # compute cider score
         score = self.compute_cider()
         # debug
