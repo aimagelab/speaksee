@@ -64,65 +64,7 @@ class CaptioningModel(nn.Module):
     def beam_search(self, images, seq_len, eos_idx, beam_size, out_size=1, *args):
         device = images.device
         b_s = images.size(0)
-        state = self.init_state(b_s, device)
-        outputs = []
-
-        for i in range(b_s):
-            state_i = tuple(s[i:i+1] for s in state)
-            images_i = images[i:i+1]
-            selected_words = None
-            cur_beam_size = beam_size
-
-            outputs_i = []
-            logprobs_i = []
-            tmp_outputs_i = [[] for _ in range(cur_beam_size)]
-            seq_logprob = .0
-            for t in range(seq_len):
-                word_logprob, state_i = self.step(t, state_i, selected_words, images_i, None, *args, mode='feedback')
-                seq_logprob = seq_logprob + word_logprob
-                selected_logprob, selected_idx = torch.sort(seq_logprob.view(-1), -1, descending=True)
-                selected_logprob, selected_idx = selected_logprob[:cur_beam_size], selected_idx[:cur_beam_size]
-
-                selected_beam = selected_idx / word_logprob.shape[1]
-                selected_words = selected_idx - selected_beam*word_logprob.shape[1]
-
-                # Update outputs with sequences that reached EOS
-                outputs_i.extend([tmp_outputs_i[x.item()] for x in torch.masked_select(selected_beam, selected_words == eos_idx)])
-                logprobs_i.extend([x.item() for x in torch.masked_select(selected_logprob, selected_words == eos_idx)])
-                cur_beam_size -= torch.sum(selected_words == eos_idx).item()
-
-                # Remove sequence if it reaches EOS
-                selected_beam = torch.masked_select(selected_beam, selected_words != eos_idx)
-                selected_logprob = torch.masked_select(selected_logprob, selected_words != eos_idx)
-                selected_words = torch.masked_select(selected_words, selected_words != eos_idx)
-
-                tmp_outputs_i = [tmp_outputs_i[x.item()] for x in selected_beam]
-                tmp_outputs_i = [o+[selected_words[x].item(),] for x, o in enumerate(tmp_outputs_i)]
-
-                if selected_beam.shape[0] == 0:
-                    break
-
-                state_i = tuple(torch.index_select(s, 0, selected_beam) for s in state_i)
-                images_i = torch.index_select(images_i, 0, selected_beam)
-                seq_logprob = selected_logprob.view(-1, 1)
-
-            # Update outputs with sequences that did not reach EOS
-            outputs_i.extend(tmp_outputs_i)
-            logprobs_i.extend([x.item() for x in selected_logprob])
-
-            # Sort result
-            outputs_i = [x for _,x in sorted(zip(logprobs_i,outputs_i), reverse=True)][:out_size]
-            if len(outputs_i) == 1:
-                outputs_i = outputs_i[0]
-            outputs.append(outputs_i)
-
-        return outputs
-
-    def beam_search_new(self, images, seq_len, eos_idx, beam_size, out_size=1, *args):
-        # todo it does not work properly
-        # todo non andare avanti se raggiungono eos con altri beam... si riesce a farlo tutto tensoriale?
-        device = images.device
-        b_s = images.size(0)
+        images_shape = images.shape
         state = self.init_state(b_s, device)
 
         seq_logprob = .0
@@ -141,7 +83,7 @@ class CaptioningModel(nn.Module):
             # Remove sequence if it reaches EOS
             if t > 0:
                 mask = selected_words.view(b_s, cur_beam_size, -1) == eos_idx
-                seq_logprob = (1-mask).float()*seq_logprob
+                seq_logprob = (1-mask).float()*seq_logprob - 999*mask.float()
             selected_logprob, selected_idx = torch.sort(seq_logprob.view(b_s, -1), -1, descending=True)
             selected_logprob, selected_idx = selected_logprob[:, :beam_size], selected_idx[:, :beam_size]
 
@@ -156,6 +98,13 @@ class CaptioningModel(nn.Module):
                 tmp_outputs[i] = [o+[selected_words[i, x].item(),] for x, o in enumerate(tmp_outputs[i])]
 
             state = tuple(torch.gather(s.view(b_s, cur_beam_size, -1), 1, selected_beam.unsqueeze(-1).expand(b_s, beam_size, s.shape[-1])).view(-1, s.shape[-1]) for s in state)
+            images_exp_shape = (b_s, cur_beam_size) + images_shape[1:]
+            images_red_shape = (b_s * beam_size, ) + images_shape[1:]
+            selected_beam_red_size = (b_s, beam_size) + tuple(1 for _ in range(len(images_exp_shape)-2))
+            selected_beam_exp_size = (b_s, beam_size) + images_exp_shape[2:]
+            images_exp = images.view(images_exp_shape)
+            selected_beam_exp = selected_beam.view(selected_beam_red_size).expand(selected_beam_exp_size)
+            images = torch.gather(images_exp, 1, selected_beam_exp).view(images_red_shape)
             seq_logprob = selected_logprob.unsqueeze(-1)
             selected_words = selected_words.view(-1)
 
