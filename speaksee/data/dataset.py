@@ -11,6 +11,7 @@ from .example import Example
 from ..utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
 from pathos.multiprocessing import ProcessingPool as Pool
+import pickle as pkl
 
 
 class Dataset(object):
@@ -169,7 +170,7 @@ class Flickr(PairedDataset):
                 filename = d['filename']
                 caption = c['raw']
                 example = Example.fromdict({'image': os.path.join(img_root, filename),
-                                   'text': caption})
+                                            'text': caption})
 
                 if d['split'] == 'train':
                     train_samples.append(example)
@@ -182,9 +183,17 @@ class Flickr(PairedDataset):
 
 
 class FlickrEntities(PairedDataset):
-    def __init__(self, image_field, text_field, det_ids_field, img_root, ann_file, entities_root, multiprocess=True):
+    def __init__(self, image_field, text_field, det_ids_field, img_root, ann_file, entities_root, precomp_file=None,
+                 multiprocess=True):
         self.multiprocess = multiprocess
-        self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file, img_root, entities_root)
+        self.precomp_file = precomp_file
+        if self.precomp_file is not None and os.path.isfile(self.precomp_file):
+            with open(self.precomp_file, 'rb') as pkl_file:
+                self.train_examples, self.val_examples, self.test_examples = pkl.load(pkl_file)
+        else:
+            self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann_file, img_root,
+                                                                                          entities_root)
+
         examples = self.train_examples + self.val_examples + self.test_examples
         super(FlickrEntities, self).__init__(examples, {'image': image_field, 'text': text_field,
                                                         'det_ids': det_ids_field})
@@ -281,6 +290,10 @@ class FlickrEntities(PairedDataset):
                 val_samples.append(example)
             elif split == 'test':
                 test_samples.append(example)
+
+        if self.precomp_file is not None:
+            with open(self.precomp_file, 'wb') as pkl_file:
+                pkl.dump((train_samples, val_samples, test_samples), pkl_file, protocol=pkl.HIGHEST_PROTOCOL)
 
         return train_samples, val_samples, test_samples
 
@@ -384,6 +397,115 @@ class COCO(PairedDataset):
         return train_samples, val_samples, test_samples
 
 
+class COCOEntities(PairedDataset):
+    def __init__(self, image_field, det_field, text_field, img_root, ann_root, entities_file, id_root=None, use_restval=True):
+        roots = {}
+        roots['train'] = {
+            'img': os.path.join(img_root, 'train2014'),
+            'cap': os.path.join(ann_root, 'captions_train2014.json')
+        }
+        roots['val'] = {
+            'img': os.path.join(img_root, 'val2014'),
+            'cap': os.path.join(ann_root, 'captions_val2014.json')
+        }
+        roots['test'] = {
+            'img': os.path.join(img_root, 'val2014'),
+            'cap': os.path.join(ann_root, 'captions_val2014.json')
+        }
+        roots['trainrestval'] = {
+            'img': (roots['train']['img'], roots['val']['img']),
+            'cap': (roots['train']['cap'], roots['val']['cap'])
+        }
+
+        if id_root is not None:
+            ids = {}
+            ids['train'] = np.load(os.path.join(id_root, 'coco_train_ids.npy'))
+            ids['val'] = np.load(os.path.join(id_root, 'coco_dev_ids.npy'))
+            ids['test'] = np.load(os.path.join(id_root, 'coco_test_ids.npy'))
+            ids['trainrestval'] = (
+                ids['train'],
+                np.load(os.path.join(id_root, 'coco_restval_ids.npy')))
+
+            if use_restval:
+                roots['train'] = roots['trainrestval']
+                ids['train'] = ids['trainrestval']
+        else:
+            ids = None
+
+        with nostdout():
+            train_examples, val_examples, test_examples = COCO.get_samples(roots, ids)
+
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples([train_examples, val_examples, test_examples], entities_file)
+
+        examples = self.train_examples + self.val_examples + self.test_examples
+        super(COCOEntities, self).__init__(examples, {'image': image_field, 'detection': det_field, 'text': text_field})
+
+    @property
+    def splits(self):
+        train_split = PairedDataset(self.train_examples, self.fields)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
+        return train_split, val_split, test_split
+
+    @classmethod
+    def get_samples(cls, samples, entities_file):
+        train_examples = []
+        val_examples = []
+        test_examples = []
+
+        with open(entities_file, 'r') as fp:
+            visual_chunks = json.load(fp)
+
+        for id_split, samples_split in enumerate(samples):
+            for s in samples_split:
+                id_image = str(int(s.image.split('/')[-1].split('_')[-1].split('.')[0]))
+                caption = s.text.lower().replace('\t', ' ').replace('\n', '')
+
+                words = caption.strip().split(' ')
+                caption_fixed = []
+                for w in words:
+                    if w not in field.TextField.punctuations and w != '':
+                        caption_fixed.append(w)
+
+                det_classes = [None for _ in caption_fixed]
+                caption_fixed = ' '.join(caption_fixed)
+
+                for p in field.TextField.punctuations:
+                    caption_fixed = caption_fixed.replace(p, '')
+
+                if id_image in visual_chunks:
+                    if caption in visual_chunks[id_image]:
+                        chunks = visual_chunks[id_image][caption]
+                        for chunk in chunks:
+                            words = chunk[0].split(' ')
+                            chunk_fixed = []
+                            for w in words:
+                                if w not in field.TextField.punctuations and w != '':
+                                    chunk_fixed.append(w)
+                            chunk_fixed = ' '.join(chunk_fixed)
+                            for p in field.TextField.punctuations:
+                                chunk_fixed = chunk_fixed.replace(p, '')
+
+                            sub_str = ' '.join(['_' for _ in chunk_fixed.split(' ')])
+                            sub_cap = caption_fixed.replace(chunk_fixed, sub_str).split(' ')
+                            for i, w in enumerate(sub_cap):
+                                if w == '_':
+                                    det_classes[i] = chunk[1]
+
+                        example = Example.fromdict({'image': s.image,
+                                                    'detection': (s.image, tuple(det_classes)),
+                                                    'text': caption_fixed})
+
+                        if id_split == 0:
+                            train_examples.append(example)
+                        elif id_split == 1:
+                            val_examples.append(example)
+                        elif id_split == 2:
+                            test_examples.append(example)
+
+        return train_examples, val_examples, test_examples
+
+
 class CUB200(PairedDataset):
     def __init__(self, image_field, text_field, img_root, ann_root, split_root):
         self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root, ann_root, split_root)
@@ -411,7 +533,8 @@ class CUB200(PairedDataset):
             filenames = [f.strip() for f in open(os.path.join(split_root, split_filename), 'r').readlines()]
 
             for filename in filenames:
-                captions = [f.strip() for f in open(os.path.join(ann_root, filename.replace('.jpg', '.txt')), 'r').readlines()]
+                captions = [f.strip() for f in
+                            open(os.path.join(ann_root, filename.replace('.jpg', '.txt')), 'r').readlines()]
                 for caption in captions:
                     example = Example.fromdict({'image': os.path.join(img_root, filename), 'text': caption})
 

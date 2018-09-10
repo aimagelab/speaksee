@@ -4,3 +4,6 @@ from .bottomup_topdown_attention import BottomupTopdownAttention
 from .bottomup_topdown_sentinel import BottomupTopdownAttention_Sentinel
 from .entities_attention import EntitiesAttention
 from .entities_attention import EntitiesAttentionImproved
+from .entities_attention import EntitiesAttentionFixed
+from .entities_attention import EntitiesAttentionImproved_LSTM
+from .entities_attention import CocoEntitiesAttention

@@ -75,6 +75,9 @@ class ImageField(RawField):
             self.precomp_index = list(precomp_file['index'][:])
             if six.PY3:
                 self.precomp_index = [s.decode('utf-8') for s in self.precomp_index]
+            # self.precomp_data = dict()
+            # for x in self.precomp_index:
+            #     self.precomp_data[x] = precomp_file['data'][self.precomp_index.index(x)]
 
     def preprocess(self, x, avoid_precomp=False):
         """
@@ -91,6 +94,7 @@ class ImageField(RawField):
             precomp_file = h5py.File(self.precomp_path, 'r')
             precomp_data = precomp_file['data']
             return precomp_data[self.precomp_index.index(x)]
+            # return self.precomp_data[x]
         else:
             x = default_loader(x)
             if self.preprocessing is not None:
@@ -128,19 +132,20 @@ class ImageDetectionsField(RawField):
     def __init__(self, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
-        # self.detections_file = h5py.File(self.detections_path, 'r')
-        # self.detections = dict()
-        # for key in self.detections_file.keys():
-        #     self.detections[key] = self.detections_file[key][()]
+        self.detections_file = h5py.File(self.detections_path, 'r')
+        self.detections = dict()
+        for key in self.detections_file.keys():
+            self.detections[key] = self.detections_file[key][()]
 
         super(ImageDetectionsField, self).__init__(None, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
-        image_id = int(x.split('_')[-1].split('.')[0])
-        det_file = h5py.File(self.detections_path, 'r')
+        # image_id = int(x.split('_')[-1].split('.')[0])
+        image_id = int(x.split('/')[-1].split('.')[0])
+        # det_file = h5py.File(self.detections_path, 'r')
         try:
-            # precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
-            precomp_data = det_file['%d' % image_id]
+            precomp_data = h5py.File(self.detections_path, 'r')['%d_features' % image_id][()]
+            # precomp_data = det_file['%d' % image_id]
         except:
             precomp_data = np.random.rand(10, 2048)
 
@@ -158,10 +163,10 @@ class ImageAssociatedDetectionsField(RawField):
         self.max_detections = 100
         self.detections_path = detections_path
         self.image_features_path = image_features_path
-        # self.detections_file = h5py.File(self.detections_path, 'r')
-        # self.detections_dict = dict()
-        # for key in self.detections_file.keys():
-        #     self.detections_dict[key] = self.detections_file[key][()]
+        self.detections_file = h5py.File(self.detections_path, 'r')
+        self.detections_dict = dict()
+        for key in self.detections_file.keys():
+            self.detections_dict[key] = self.detections_file[key][()]
 
         img_precomp_file = h5py.File(self.image_features_path, 'r')
         self.precomp_index = list(img_precomp_file['index'][:])
@@ -194,12 +199,12 @@ class ImageAssociatedDetectionsField(RawField):
         gt_bboxes_set = x[1]
 
         id_image = image.split('/')[-1].split('.')[0]
-        f = h5py.File(self.detections_path, 'r')
-        det_bboxes = f['%s_boxes' % id_image]
-        det_features = f['%s_features' % id_image]
+        # f = h5py.File(self.detections_path, 'r')
+        # det_bboxes = f['%s_boxes' % id_image]
+        # det_features = f['%s_features' % id_image]
 
-        # det_bboxes = self.detections_dict['%s_boxes' % id_image]
-        # det_features = self.detections_dict['%s_features' % id_image]
+        det_bboxes = self.detections_dict['%s_boxes' % id_image]
+        det_features = self.detections_dict['%s_features' % id_image]
         feature_dim = det_features.shape[-1]
         features = np.zeros((self.max_detections, feature_dim))
 
@@ -220,6 +225,184 @@ class ImageAssociatedDetectionsField(RawField):
             features[i] = np.asarray(det_features[id_bbox])
 
         return features.astype(np.float32), self.image_features_precomp[image]
+
+
+class CocoImageAssociatedDetectionsField(RawField):
+    def __init__(self, postprocessing=None, detections_path=None, classes_path=None,
+                 padding_idx=0, fix_length=None, pad_init=True, pad_eos=True, dtype=torch.long,
+                 max_detections=100, max_length=100):
+        self.max_detections = max_detections
+        self.max_length = max_length
+        self.detections_path = detections_path
+        self.padding_idx = padding_idx
+        self.fix_length = fix_length
+        self.init_token = padding_idx if pad_init else None
+        self.eos_token = padding_idx if pad_eos else None
+        self.dtype = dtype
+
+        # self.detections_file = h5py.File(self.detections_path, 'r')
+        # self.detections_dict = dict()
+        # for key in self.detections_file.keys():
+        #     self.detections_dict[key] = self.detections_file[key][()]
+
+        self.classes = ['__background__']
+        with open(classes_path, 'r') as f:
+            for object in f.readlines():
+                self.classes.append(object.split(',')[0].lower().strip())
+
+        super(CocoImageAssociatedDetectionsField, self).__init__(None, postprocessing)
+
+    def preprocess(self, x, avoid_precomp=False):
+
+        image = x[0]
+        det_classes = x[1]
+
+        id_image = int(image.split('/')[-1].split('_')[-1].split('.')[0])
+        f = h5py.File(self.detections_path, 'r')
+        det_cls_probs = f['%s_cls_prob' % id_image][()]
+        det_features = f['%s_features' % id_image][()]
+        # det_cls_probs = self.detections_dict['%s_cls_prob' % id_image]
+        # det_features = self.detections_dict['%s_features' % id_image]
+
+        feature_dim = det_features.shape[-1]
+        features = np.zeros((self.max_detections, feature_dim))
+        det_ids = np.zeros((len(det_classes), ))
+
+        selected_classes = [self.classes[np.argmax(det_cls_probs[i][1:])+1] for i in range(len(det_cls_probs))]
+        probas = [np.max(det_cls_probs[i][1:]) for i in range(len(det_cls_probs))]
+
+        det_seq = list(set([c for c in det_classes if c is not None]))
+
+        for i, cls in enumerate(det_seq):
+            max_prob = 0
+            id_det = -1
+            for k in range(len(selected_classes)):
+                if cls == selected_classes[k]:
+                    if probas[k] > max_prob:
+                        max_prob = probas[k]
+                        id_det = k
+            features[i] = det_features[id_det]
+
+        for i, cls in enumerate(det_classes):
+            if cls is not None:
+                det_ids[i] = [i for i in range(len(det_seq)) if det_seq[i] == cls][0] + 1
+
+        # det_ids = det_ids[:self.max_length]
+
+        return features.astype(np.float32), det_ids
+
+    def process(self, minibatch, device=None):
+        minibatch = list(zip(*minibatch))
+
+        if self.fix_length is None:
+            max_len = max(len(x) for x in minibatch[1])
+        else:
+            max_len = self.fix_length + (
+                self.init_token, self.eos_token).count(None) - 2
+        padded, lengths = [], []
+        for x in minibatch[1]:
+            padded.append(
+                ([] if self.init_token is None else [self.init_token]) +
+                list(x[:max_len]) +
+                ([] if self.eos_token is None else [self.eos_token]) +
+                [self.padding_idx] * max(0, max_len - len(x)))
+
+        minibatch[1] = torch.tensor(padded, dtype=self.dtype, device=device)
+        return default_collate(list(zip(*minibatch)))
+
+
+class CocoMultipleAssociatedDetectionsField(RawField):
+    def __init__(self, postprocessing=None, detections_path=None, classes_path=None,
+                 padding_idx=0, fix_length=None, pad_init=True, pad_eos=True, dtype=torch.long,
+                 max_detections=100, max_length=100):
+        self.max_detections = max_detections
+        self.max_length = max_length
+        self.detections_path = detections_path
+        self.padding_idx = padding_idx
+        self.fix_length = fix_length
+        self.init_token = padding_idx if pad_init else None
+        self.eos_token = padding_idx if pad_eos else None
+        self.dtype = dtype
+
+        # self.detections_file = h5py.File(self.detections_path, 'r')
+        # self.detections_dict = dict()
+        # for key in self.detections_file.keys():
+        #     self.detections_dict[key] = self.detections_file[key][()]
+
+        self.classes = ['__background__']
+        with open(classes_path, 'r') as f:
+            for object in f.readlines():
+                self.classes.append(object.split(',')[0].lower().strip())
+
+        super(CocoMultipleAssociatedDetectionsField, self).__init__(None, postprocessing)
+
+    def get_detections_inside(self, det_boxes, query):
+        cond1 = det_boxes[:, 0] >= det_boxes[query, 0]
+        cond2 = det_boxes[:, 1] >= det_boxes[query, 1]
+        cond3 = det_boxes[:, 2] <= det_boxes[query, 2]
+        cond4 = det_boxes[:, 3] <= det_boxes[query, 3]
+        cond = cond1 & cond2 & cond3 & cond4
+        return np.nonzero(cond)[0]
+
+    def preprocess(self, x, avoid_precomp=False):
+        image = x[0]
+        det_classes = x[1]
+
+        id_image = int(image.split('/')[-1].split('_')[-1].split('.')[0])
+        f = h5py.File(self.detections_path, 'r')
+        det_cls_probs = f['%s_cls_prob' % id_image][()]
+        det_features = f['%s_features' % id_image][()]
+        det_boxes = f['%s_boxes' % id_image][()]
+        # det_cls_probs = self.detections_dict['%s_cls_prob' % id_image]
+        # det_features = self.detections_dict['%s_features' % id_image]
+        # det_boxes = self.detections_dict['%s_boxes' % id_image]
+
+        feature_dim = det_features.shape[-1]
+        features = np.zeros((self.max_detections, feature_dim))
+        features[:min(len(det_features), self.max_detections)] = det_features[:min(len(det_features), self.max_detections)]
+
+        det_ids = np.full((len(det_classes), self.max_detections), -1)
+        selected_classes = [self.classes[np.argmax(det_cls_probs[i][1:])+1] for i in range(len(det_cls_probs))]
+
+        for t, cls in enumerate(det_classes):
+            if cls is None:
+                det_ids[t, 0] = 0
+            else:
+                seed_detections = [i for i, c in enumerate(selected_classes) if c == cls]
+                seed_detections_probs = np.asarray([np.max(det_cls_probs[i][1:]) for i in seed_detections])
+                detections = np.concatenate([np.asarray([seed_detections[np.argmax(seed_detections_probs)]]), ] + [self.get_detections_inside(det_boxes, d) for d in seed_detections]) + 1
+                det_ids[t, :min(len(detections), self.max_detections)] = detections[:min(len(detections), self.max_detections)]
+
+        return features.astype(np.float32), det_ids
+
+    def process(self, minibatch, device=None):
+        minibatch = list(zip(*minibatch))
+
+        if self.fix_length is None:
+            max_len = max(len(x) for x in minibatch[1])
+        else:
+            max_len = self.fix_length + (
+                self.init_token, self.eos_token).count(None) - 2
+        padded, lengths = [], []
+        for x in minibatch[1]:
+            this_pad = x[:max_len]
+            dim = x.shape[-1]
+            if self.init_token is not None:
+                conc = np.full((1, dim), -1)
+                conc[0, 0] = self.init_token
+                this_pad = np.concatenate([conc, this_pad])
+            if self.eos_token is not None:
+                conc = np.full((1, dim), -1)
+                conc[0, 0] = self.eos_token
+                this_pad = np.concatenate([this_pad, conc])
+
+            conc = np.full((max(0, max_len - len(x)), dim), -1)
+            conc[:, 0] = self.padding_idx
+            this_pad = np.concatenate([this_pad, conc])
+            padded.append(this_pad)
+
+        minibatch[1] = torch.tensor(padded, dtype=self.dtype, device=device)
+        return default_collate(list(zip(*minibatch)))
 
 
 class PadField(RawField):
