@@ -47,13 +47,14 @@ class CiderScorer(object):
     """CIDEr scorer.
     """
 
-    def __init__(self, refs, test=None, n=4, sigma=6.0, doc_frequency=None):
+    def __init__(self, refs, test=None, n=4, sigma=6.0, doc_frequency=None, ref_len=None):
         ''' singular instance '''
         self.n = n
         self.sigma = sigma
         self.crefs = []
         self.ctest = []
         self.doc_frequency = defaultdict(float)
+        self.ref_len = None
 
         for k in refs.keys():
             self.crefs.append(cook_refs(refs[k]))
@@ -62,12 +63,14 @@ class CiderScorer(object):
             else:
                 self.ctest.append(None)  # lens of crefs and ctest have to match
 
-        self.ref_len = None
-        if doc_frequency is None:
+        if doc_frequency is None and ref_len is None:
             # compute idf
             self.compute_doc_freq()
+            # compute log reference length
+            self.ref_len = np.log(float(len(self.crefs)))
         else:
             self.doc_frequency = doc_frequency
+            self.ref_len = ref_len
 
     def compute_doc_freq(self):
         '''
@@ -137,9 +140,6 @@ class CiderScorer(object):
                 val[n] *= np.e**(-(delta**2)/(2*self.sigma**2))
             return val
 
-        # compute log reference length
-        self.ref_len = np.log(float(len(self.crefs)))
-
         scores = []
         for test, refs in zip(self.ctest, self.crefs):
             # compute vector for test captions
@@ -160,8 +160,6 @@ class CiderScorer(object):
         return scores
 
     def compute_score(self):
-        # assert to check document frequency
-        assert(len(self.ctest) >= max(self.doc_frequency.values()))
         # compute cider score
         score = self.compute_cider()
         # debug
