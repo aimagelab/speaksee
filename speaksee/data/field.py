@@ -8,6 +8,8 @@ from tqdm import tqdm
 import numpy as np
 import h5py
 import os
+import warnings
+import shutil
 
 from .dataset import Dataset
 from ..vocab import Vocab
@@ -128,18 +130,27 @@ class ImageDetectionsField(RawField):
     def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
         self.max_detections = 100
         self.detections_path = detections_path
-        detections_file = h5py.File(self.detections_path, 'r')
-        self.detections = dict()
-        for key in self.detections_file.keys():
-            self.detections[key] = self.detections_file[key][()]
+
+        tmp_detections_path = os.path.join('/tmp', os.path.basename(detections_path))
+        if not os.path.isfile(tmp_detections_path):
+            if shutil.disk_usage("/tmp")[-1] // (2 ** 30) < 32:
+                warnings.warn('Loading from %s, because /tmp is full.' % detections_path)
+            else:
+                warnings.warn("Copying detection file to /tmp")
+                shutil.copyfile(detections_path, tmp_detections_path)
+                self.detections_path = tmp_detections_path
+                warnings.warn("Done.")
+        else:
+            self.detections_path = tmp_detections_path
 
         super(ImageDetectionsField, self).__init__(preprocessing, postprocessing)
 
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
         try:
-            precomp_data = h5py.File(self.detections_path, 'r')['%d' % image_id][()]
-        except:
+            precomp_data = h5py.File(self.detections_path, 'r')['%d_features' % image_id][()]
+        except KeyError:
+            warnings.warn('Could not find detections for %d' % image_id)
             precomp_data = np.random.rand(10,2048)
 
         delta = self.max_detections - precomp_data.shape[0]
