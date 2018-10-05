@@ -151,7 +151,8 @@ print("CIDEr is %f" % val_cider)
 ### Model zoo
 | Model        | CIDEr | Download   |
 |--------------|-------|------------|
-| FC-2k (beam) | 93.78 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/fc_epoch_029.pth)        |
+| FC-2k (beam) | 93.8 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/fc_epoch_029.pth)        |
+| Bottomup Topdown with sentinel | 117.8 | [Download](http://aimagelab.ing.unimore.it/speaksee/model_zoo/bottomup_topdown_sentinel_relu_epoch_063.pth)      
 
 
 ### The team
