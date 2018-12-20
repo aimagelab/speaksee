@@ -17,3 +17,14 @@ class EncodeCNN(object):
             x = self.cnn(x).squeeze(0).data.cpu().numpy()
 
         return x
+
+
+class ApplyTransform(object):
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, x):
+        if self.transforms is not None:
+            x = self.transforms(x)
+
+        return x
