@@ -1,16 +1,12 @@
 import os
 import json
 import numpy as np
-import re
 import itertools
 import collections
 import torch
-import xml.etree.ElementTree
-from . import field
 from .example import Example
 from ..utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
-from pathos.multiprocessing import ProcessingPool as Pool
 
 
 class Dataset(object):
@@ -136,6 +132,11 @@ class DictionaryDataset(Dataset):
         return len(self.key_dataset)
 
 
+def unique(sequence):
+    seen = set()
+    return [x for x in sequence if not (x in seen or seen.add(x))]
+
+
 class PairedDataset(Dataset):
     def __init__(self, examples, fields):
         assert ('image' in fields)
@@ -145,15 +146,17 @@ class PairedDataset(Dataset):
         self.text_field = self.fields['text']
 
     def image_set(self):
-        image_set = set(e.image for e in self.examples)
+        img_list = [e.image for e in self.examples]
+        image_set = unique(img_list)
         examples = [Example.fromdict({'image': i}) for i in image_set]
         dataset = Dataset(examples, {'image': self.image_field})
         return dataset
 
     def text_set(self):
-        text_set = set(e.text for e in self.examples)
-        examples = [Example.fromdict({'text': t}) for t in text_set]
-        dataset = Dataset(examples, {'text': self.image_field})
+        text_list = [e.text for e in self.examples]
+        text_list = unique(text_list)
+        examples = [Example.fromdict({'text': t}) for t in text_list]
+        dataset = Dataset(examples, {'text': self.text_field})
         return dataset
 
     def image_dictionary(self, fields=None):
@@ -211,9 +214,8 @@ class Flickr(PairedDataset):
 
 
 class COCO(PairedDataset):
-    # TODO check correctness of Karpathy's splits.
-    # TODO fix behaviour when use_restval=False
-    def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=True):
+    def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=True,
+                 cut_validation=False):
         roots = {}
         roots['train'] = {
             'img': os.path.join(img_root, 'train2014'),
@@ -236,6 +238,8 @@ class COCO(PairedDataset):
             ids = {}
             ids['train'] = np.load(os.path.join(id_root, 'coco_train_ids.npy'))
             ids['val'] = np.load(os.path.join(id_root, 'coco_dev_ids.npy'))
+            if cut_validation:
+                ids['val'] = ids['val'][:5000]
             ids['test'] = np.load(os.path.join(id_root, 'coco_test_ids.npy'))
             ids['trainrestval'] = (
                 ids['train'],
