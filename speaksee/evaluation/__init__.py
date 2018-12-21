@@ -3,6 +3,7 @@ from .meteor import Meteor
 from .rouge import Rouge
 from .cider import Cider
 from .spice import Spice
+from .recall import recall
 from .tokenizer import PTBTokenizer
 
 def compute_scores(gts, gen):

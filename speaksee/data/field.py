@@ -127,9 +127,11 @@ class ImageField(RawField):
 
 
 class ImageDetectionsField(RawField):
-    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None):
-        self.max_detections = 100
+    def __init__(self, preprocessing=None, postprocessing=None, detections_path=None, max_detections=100,
+                 sort_by_prob=False):
+        self.max_detections = max_detections
         self.detections_path = detections_path
+        self.sort_by_prob = sort_by_prob
 
         tmp_detections_path = os.path.join('/tmp', os.path.basename(detections_path))
         if not os.path.isfile(tmp_detections_path):
@@ -148,7 +150,10 @@ class ImageDetectionsField(RawField):
     def preprocess(self, x, avoid_precomp=False):
         image_id = int(x.split('_')[-1].split('.')[0])
         try:
-            precomp_data = h5py.File(self.detections_path, 'r')['%d_features' % image_id][()]
+            f = h5py.File(self.detections_path, 'r')
+            precomp_data = f['%d_features' % image_id][()]
+            if self.sort_by_prob:
+                precomp_data = precomp_data[np.argsort(np.max(f['%d_cls_prob' % image_id][()], -1))[::-1]]
         except KeyError:
             warnings.warn('Could not find detections for %d' % image_id)
             precomp_data = np.random.rand(10,2048)
@@ -281,7 +286,6 @@ class TextField(RawField):
         if self.include_lengths:
             return padded, lengths
         return padded
-
 
     def numericalize(self, arr, device=None):
         """Turn a batch of examples that use this field into a list of Variables.
