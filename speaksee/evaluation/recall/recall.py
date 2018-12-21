@@ -5,13 +5,19 @@ def recall(images, captions, model, mode='i2t', npts=None, data='coco', lenghts=
     step = 5 if data is 'coco' else 1
 
     if npts is None:
-        npts = images.shape[0] // step
+        if isinstance(images, list) or isinstance(images, tuple):
+            npts = images[0].shape[0] // step
+        else:
+            npts = images.shape[0] // step
 
     ranks = np.zeros(npts) if mode is 'i2t' else np.zeros(step * npts)
     top1 = np.zeros(npts) if mode is 'i2t' else np.zeros(step * npts)
 
     caps = captions
-    ims = images[::step]
+    if isinstance(images, list) or isinstance(images, tuple):
+        ims = [i[::step] for i in images]
+    else:
+        ims = images[::step]
 
     if mode is 'i2t':
         d_arr = model.similarity(ims, caps, lenghts).cpu().detach().numpy()
