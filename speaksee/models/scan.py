@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.init
-import torchvision.models as models
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.nn.utils.weight_norm import weight_norm
 from torch.nn.utils.clip_grad import clip_grad_norm
@@ -155,7 +154,7 @@ class EncoderText(nn.Module):
         cap_emb, cap_len = padded
 
         if self.use_bi_gru:
-            cap_emb = (cap_emb[:, :, :cap_emb.size(2) / 2] + cap_emb[:, :, cap_emb.size(2) / 2:]) / 2
+            cap_emb = (cap_emb[:, :, :cap_emb.size(2) // 2] + cap_emb[:, :, cap_emb.size(2) // 2:]) / 2
 
         # normalization in the joint embedding space
         if not self.no_txtnorm:
@@ -335,10 +334,10 @@ class SCAN(VisualSemanticModel):
         self.grad_clip = opt.grad_clip
         self.opt = opt
         img_enc = EncoderImage(opt.data_name, opt.img_dim, opt.embed_size,
-                                    precomp_enc_type=opt.precomp_enc_type, no_imgnorm=opt.no_imgnorm).to(device)
+                                    precomp_enc_type=opt.precomp_enc_type, no_imgnorm=opt.no_imgnorm)
         txt_enc = EncoderText(opt.vocab_size, opt.word_dim,
                                    opt.embed_size, opt.num_layers,
-                                   use_bi_gru=opt.bi_gru, no_txtnorm=opt.no_txtnorm).to(device)
+                                   use_bi_gru=opt.bi_gru, no_txtnorm=opt.no_txtnorm)
 
         super(SCAN, self).__init__(txt_enc, img_enc)
 
