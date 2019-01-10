@@ -65,6 +65,24 @@ class RawField(object):
         return default_collate(batch)
 
 
+class Merge(RawField):
+    def __init__(self, *fields):
+        super(Merge, self).__init__()
+        self.fields = fields
+
+    def preprocess(self, x):
+        return tuple(f.preprocess(x) for f in self.fields)
+
+    def process(self, batch, *args, **kwargs):
+        if len(self.fields) == 1:
+            batch = [batch, ]
+        else:
+            batch = list(zip(*batch))
+
+        out = list(f.process(b, *args, **kwargs) for f, b in zip(self.fields, batch))
+        return out
+
+
 class ImageField(RawField):
     def __init__(self, preprocessing=None, postprocessing=None, precomp_path=None):
         super(ImageField, self).__init__(preprocessing, postprocessing)
