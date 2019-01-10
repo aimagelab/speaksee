@@ -146,16 +146,16 @@ class ImageField(RawField):
 
 class ImageDetectionsField(RawField):
     def __init__(self, preprocessing=None, postprocessing=None, detections_path=None, max_detections=100,
-                 sort_by_prob=False):
+                 sort_by_prob=False, load_in_tmp=True):
         self.max_detections = max_detections
         self.detections_path = detections_path
         self.sort_by_prob = sort_by_prob
 
         tmp_detections_path = os.path.join('/tmp', os.path.basename(detections_path))
         if not os.path.isfile(tmp_detections_path):
-            if shutil.disk_usage("/tmp")[-1] // (2 ** 30) < 32:
-                warnings.warn('Loading from %s, because /tmp is full.' % detections_path)
-            else:
+            if shutil.disk_usage("/tmp")[-1] < os.path.getsize(detections_path):
+                warnings.warn('Loading from %s, because /tmp has no enough space.' % detections_path)
+            elif load_in_tmp:
                 warnings.warn("Copying detection file to /tmp")
                 shutil.copyfile(detections_path, tmp_detections_path)
                 self.detections_path = tmp_detections_path
