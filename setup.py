@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='speaksee',
-      version='0.0.dev1',
+      version='0.0.1',
       description='PyTorch utilities and models for Visual-Semantic tasks',
       url='http://github.com/aimagelab/speaksee',
       author='Lorenzo Baraldi, Marcella Cornia',
