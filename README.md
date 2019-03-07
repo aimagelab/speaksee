@@ -160,5 +160,5 @@ print("CIDEr is %f" % val_cider)
 
 
 ### The team
-Speaksee is currently maintained by [Lorenzo Baraldi](http://www.lorenzobaraldi.com) and
- [Marcella Cornia](http://imagelab.ing.unimore.it/imagelab/person.asp?idpersona=90)
+Speaksee is currently maintained by [Lorenzo Baraldi](http://www.lorenzobaraldi.com),
+ [Marcella Cornia](http://imagelab.ing.unimore.it/imagelab/person.asp?idpersona=90) and [Matteo Stefanini](https://github.com/MatteoStefanini)
