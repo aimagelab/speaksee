@@ -99,7 +99,7 @@ class BottomupTopdownAttention(CaptioningModel):
                 it = it.to(device)
             else:
                 it = seq[:, t]
-        elif mode == 'feedback':
+        elif mode == 'feedback': # test
             if t == 0:
                 it = detections.data.new_full((b_s,), bos_idx).long()
             else:

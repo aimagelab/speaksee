@@ -212,7 +212,7 @@ class TextField(RawField):
     def __init__(self, use_vocab=True, init_token=None, eos_token=None, fix_length=None, dtype=torch.long,
                  preprocessing=None, postprocessing=None, lower=False, tokenize=(lambda s: s.split()),
                  remove_punctuation=False, include_lengths=False, batch_first=True, pad_token="<pad>",
-                 unk_token="<unk>", pad_first=False, truncate_first=False):
+                 unk_token="<unk>", pad_first=False, truncate_first=False, vectors=None):
         self.use_vocab = use_vocab
         self.init_token = init_token
         self.eos_token = eos_token
@@ -228,6 +228,7 @@ class TextField(RawField):
         self.pad_first = pad_first
         self.truncate_first = truncate_first
         self.vocab = None
+        self.vectors = vectors
         super(TextField, self).__init__(preprocessing, postprocessing)
 
     def preprocess(self, x):
@@ -331,7 +332,11 @@ class TextField(RawField):
 
             if self.postprocessing is not None:
                 arr = self.postprocessing(arr, self.vocab)
+
+            var = torch.tensor(arr, dtype=self.dtype, device=device)
         else:
+            if self.vectors:
+                arr = [[self.vectors[x] for x in ex] for ex in arr]
             if self.dtype not in self.dtypes:
                 raise ValueError(
                     "Specified Field dtype {} can not be used with "
@@ -342,14 +347,15 @@ class TextField(RawField):
             # It doesn't make sense to explictly coerce to a numeric type if
             # the data is sequential, since it's unclear how to coerce padding tokens
             # to a numeric type.
-            if not self.sequential:
-                arr = [numericalization_func(x) if isinstance(x, six.string_types)
-                       else x for x in arr]
+            arr = [numericalization_func(x) if isinstance(x, six.string_types)
+                   else x for x in arr]
+
             if self.postprocessing is not None:
                 arr = self.postprocessing(arr, None)
 
-        var = torch.tensor(arr, dtype=self.dtype, device=device)
+            var = torch.cat([torch.cat([a.unsqueeze(0) for a in ar]).unsqueeze(0) for ar in arr])
 
+        # var = torch.tensor(arr, dtype=self.dtype, device=device)
         if not self.batch_first:
             var.t_()
         var = var.contiguous()
