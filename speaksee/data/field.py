@@ -152,16 +152,18 @@ class ImageDetectionsField(RawField):
         self.sort_by_prob = sort_by_prob
 
         tmp_detections_path = os.path.join('/tmp', os.path.basename(detections_path))
-        if not os.path.isfile(tmp_detections_path):
-            if shutil.disk_usage("/tmp")[-1] < os.path.getsize(detections_path):
-                warnings.warn('Loading from %s, because /tmp has no enough space.' % detections_path)
-            elif load_in_tmp:
-                warnings.warn("Copying detection file to /tmp")
-                shutil.copyfile(detections_path, tmp_detections_path)
+
+        if load_in_tmp:
+            if not os.path.isfile(tmp_detections_path):
+                if shutil.disk_usage("/tmp")[-1] < os.path.getsize(detections_path):
+                    warnings.warn('Loading from %s, because /tmp has no enough space.' % detections_path)
+                else:
+                    warnings.warn("Copying detection file to /tmp")
+                    shutil.copyfile(detections_path, tmp_detections_path)
+                    warnings.warn("Done.")
+                    self.detections_path = tmp_detections_path
+            else:
                 self.detections_path = tmp_detections_path
-                warnings.warn("Done.")
-        else:
-            self.detections_path = tmp_detections_path
 
         super(ImageDetectionsField, self).__init__(preprocessing, postprocessing)
 
