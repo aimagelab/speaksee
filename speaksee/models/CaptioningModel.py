@@ -97,7 +97,15 @@ class CaptioningModel(nn.Module):
             selected_beam = selected_idx / seq_logprob.shape[-1]
             selected_words = selected_idx - selected_beam*seq_logprob.shape[-1]
 
-            state = tuple(torch.gather(s.view(b_s, cur_beam_size, -1), 1, selected_beam.unsqueeze(-1).expand(b_s, beam_size, s.shape[-1])).view(-1, s.shape[-1]) for s in state)
+            new_state = []
+            for s in state:
+                shape = [int(sh) for sh in s.shape]
+                s = torch.gather(s.view(*([b_s, cur_beam_size] + shape[1:])), 1, selected_beam.unsqueeze(-1).expand(
+                    *([b_s, beam_size] + shape[1:])))
+                s = s.view(*([-1,] + shape[1:]))
+                new_state.append(s)
+            state = tuple(new_state)
+
             images_exp_shape = (b_s, cur_beam_size) + images_shape[1:]
             images_red_shape = (b_s * beam_size, ) + images_shape[1:]
             selected_beam_red_size = (b_s, beam_size) + tuple(1 for _ in range(len(images_exp_shape)-2))
