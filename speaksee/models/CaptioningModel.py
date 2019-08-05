@@ -100,8 +100,11 @@ class CaptioningModel(nn.Module):
             new_state = []
             for s in state:
                 shape = [int(sh) for sh in s.shape]
-                s = torch.gather(s.view(*([b_s, cur_beam_size] + shape[1:])), 1, selected_beam.unsqueeze(-1).expand(
-                    *([b_s, beam_size] + shape[1:])))
+                beam = selected_beam
+                for _ in shape[1:]:
+                    beam = beam.unsqueeze(-1)
+                s = torch.gather(s.view(*([b_s, cur_beam_size] + shape[1:])), 1,
+                                 beam.expand(*([b_s, beam_size] + shape[1:])))
                 s = s.view(*([-1,] + shape[1:]))
                 new_state.append(s)
             state = tuple(new_state)
