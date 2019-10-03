@@ -209,7 +209,7 @@ class TextField(RawField):
         torch.long: int,
     }
     punctuations = ["''", "'", "``", "`", "-LRB-", "-RRB-", "-LCB-", "-RCB-", \
-                    ".", "?", "!", ",", ":", "-", "--", "...", ";"]
+                    ".", "?", "!", ",", ":", "-", "--", "...", ";", ".."]
 
     def __init__(self, use_vocab=True, init_token=None, eos_token=None, fix_length=None, dtype=torch.long,
                  preprocessing=None, postprocessing=None, lower=False, tokenize=(lambda s: s.split()),

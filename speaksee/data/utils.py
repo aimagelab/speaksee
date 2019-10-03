@@ -6,7 +6,7 @@ def get_tokenizer(tokenizer):
         try:
             import spacy
             spacy_en = spacy.load('en')
-            return lambda s: [tok.text for tok in spacy_en.tokenizer(s)]
+            return lambda s: [tok.text for tok in spacy_en.tokenizer(s) if not tok.is_punct]
         except ImportError:
             print("Please install SpaCy and the SpaCy English tokenizer. "
                   "See the docs at https://spacy.io for more information.")
