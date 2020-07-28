@@ -214,7 +214,7 @@ class TextField(RawField):
     def __init__(self, use_vocab=True, init_token=None, eos_token=None, fix_length=None, dtype=torch.long,
                  preprocessing=None, postprocessing=None, lower=False, tokenize=(lambda s: s.split()),
                  remove_punctuation=False, include_lengths=False, batch_first=True, pad_token="<pad>",
-                 unk_token="<unk>", pad_first=False, truncate_first=False, vectors=None):
+                 unk_token="<unk>", pad_first=False, truncate_first=False, vectors=None, mask_token=None):
         self.use_vocab = use_vocab
         self.init_token = init_token
         self.eos_token = eos_token
@@ -231,6 +231,7 @@ class TextField(RawField):
         self.truncate_first = truncate_first
         self.vocab = None
         self.vectors = vectors
+        self.mask_token = mask_token
         super(TextField, self).__init__(preprocessing, postprocessing)
 
     def preprocess(self, x):
@@ -270,7 +271,7 @@ class TextField(RawField):
 
         specials = list(OrderedDict.fromkeys([
             tok for tok in [self.unk_token, self.pad_token, self.init_token,
-                            self.eos_token]
+                            self.eos_token, self.mask_token]
             if tok is not None]))
         self.vocab = self.vocab_cls(counter, specials=specials, **kwargs)
 
